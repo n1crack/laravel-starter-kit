@@ -26,6 +26,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Initial Page Element
+    |--------------------------------------------------------------------------
+    |
+    | Inertia recently updated the way it injects the initial page payload
+    | into the DOM. By setting this to true, the payload will be placed
+    | in a <script> element instead of a data attribute on a <div>.
+    |
+    */
+
+    'use_script_element_for_initial_page' => true,
+
+    /*
+    |--------------------------------------------------------------------------
     | Testing
     |--------------------------------------------------------------------------
     |

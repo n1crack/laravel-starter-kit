@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Hash;
@@ -20,6 +21,8 @@ final readonly class CreateUser
             ...$attributes,
             'password' => Hash::make($password),
         ]);
+
+        $user->assignRole(Role::User);
 
         event(new Registered($user));
 

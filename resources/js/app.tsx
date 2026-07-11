@@ -2,6 +2,7 @@ import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initializeTheme } from './hooks/use-appearance';
 
@@ -12,9 +13,13 @@ createInertiaApp({
     resolve: (name) =>
         resolvePageComponent(
             `./pages/${name}.tsx`,
-            import.meta.glob('./pages/**/*.tsx'),
+            import.meta.glob<ComponentType>('./pages/**/*.tsx'),
         ),
     setup({ el, App, props }) {
+        if (!el) {
+            throw new Error('Root element not found.');
+        }
+
         const root = createRoot(el);
 
         root.render(<App {...props} />);

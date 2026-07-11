@@ -12,51 +12,41 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import { type NavItem, type SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShieldCheck } from 'lucide-react';
+import { index as adminUsers } from '@/routes/admin/users';
+import { type NavItem } from '@/types';
+import { Link } from '@inertiajs/react';
+import { LayoutGrid, PanelLeft, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
+        href: adminDashboard(),
         icon: LayoutGrid,
     },
-];
-
-const adminNavItems: NavItem[] = [
     {
-        title: 'Admin',
-        href: adminDashboard(),
-        icon: ShieldCheck,
+        title: 'Users',
+        href: adminUsers(),
+        icon: Users,
     },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
+        title: 'User panel',
+        href: dashboard(),
+        icon: PanelLeft,
     },
 ];
 
-export function AppSidebar() {
-    const { auth } = usePage<SharedData>().props;
-    const isAdmin = auth.roles.includes('admin');
-
+export function AdminSidebar() {
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={adminDashboard()} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -65,13 +55,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain
-                    items={
-                        isAdmin
-                            ? [...mainNavItems, ...adminNavItems]
-                            : mainNavItems
-                    }
-                />
+                <NavMain items={mainNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
