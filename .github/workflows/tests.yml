@@ -22,6 +22,10 @@ jobs:
           php-version: 8.4
           tools: composer:v2
           coverage: xdebug
+          # php-code-coverage 14 counts assert() calls as executable lines, so
+          # they must actually run for coverage to reach 100%. setup-php uses
+          # php.ini-production by default, where zend.assertions is -1.
+          ini-values: zend.assertions=1
 
       - name: Setup Node
         uses: actions/setup-node@v7
