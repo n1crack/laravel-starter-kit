@@ -12,12 +12,12 @@ beforeEach(function (): void {
 });
 
 it('lists users for admins', function (): void {
-    User::factory(3)->create()->each(fn (User $user) => $user->assignRole(RoleEnum::User));
+    User::factory(3)->create()->each(fn (User $user): User => $user->assignRole(RoleEnum::User));
 
     $response = $this->actingAs($this->admin)->get(route('admin.users.index'));
 
     $response->assertOk()->assertInertia(
-        fn (AssertableInertia $page) => $page
+        fn (AssertableInertia $page): AssertableInertia => $page
             ->component('admin/users/index')
             ->has('users.data', 4)
             ->has('availableRoles'),
@@ -31,7 +31,7 @@ it('filters users by search term', function (): void {
     $response = $this->actingAs($this->admin)->get(route('admin.users.index', ['search' => 'Ayşe']));
 
     $response->assertOk()->assertInertia(
-        fn (AssertableInertia $page) => $page
+        fn (AssertableInertia $page): AssertableInertia => $page
             ->component('admin/users/index')
             ->has('users.data', 1)
             ->where('users.data.0.name', 'Ayşe Yılmaz'),
@@ -45,7 +45,7 @@ it('filters users by role', function (): void {
     $response = $this->actingAs($this->admin)->get(route('admin.users.index', ['roles' => ['admin']]));
 
     $response->assertOk()->assertInertia(
-        fn (AssertableInertia $page) => $page
+        fn (AssertableInertia $page): AssertableInertia => $page
             ->component('admin/users/index')
             ->has('users.data', 1)
             ->where('users.data.0.id', $this->admin->id),

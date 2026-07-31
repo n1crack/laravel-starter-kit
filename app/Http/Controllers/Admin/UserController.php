@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,13 +20,13 @@ final readonly class UserController
 
         $users = User::query()
             ->with('roles:id,name')
-            ->when($search !== '', fn ($query) => $query->where(
-                fn ($query) => $query
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(
+                fn (Builder $query): Builder => $query
                     ->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%"),
             ))
-            ->when($roles->isNotEmpty(), fn ($query) => $query->whereHas(
-                'roles', fn ($query) => $query->whereIn('name', $roles),
+            ->when($roles->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas(
+                'roles', fn (Builder $query): Builder => $query->whereIn('name', $roles),
             ))
             ->latest()
             ->paginate(10)
