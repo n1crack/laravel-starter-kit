@@ -1,11 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "nunomaduro/laravel-starter-kit-inertia-react",
+    "name": "n1crack/laravel-starter-kit",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "A Laravel starter kit serving public pages with Blade and Livewire, and the admin and user panels with Inertia and React.",
     "keywords": [
         "laravel",
-        "framework"
+        "starter-kit",
+        "blade",
+        "livewire",
+        "inertia",
+        "react"
     ],
     "license": "MIT",
     "require": {
