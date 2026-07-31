@@ -26,6 +26,6 @@ final class DatabaseSeeder extends Seeder
 
         User::factory(25)
             ->create()
-            ->each(fn (User $user) => $user->assignRole(RoleEnum::User));
+            ->each(fn (User $user): User => $user->assignRole(RoleEnum::User));
     }
 }
