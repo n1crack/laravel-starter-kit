@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Tenants are normally created by the application that administers them; this
+ * factory exists so tests can stand one up.
+ *
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Tenant>
+ */
+final class TenantFactory extends Factory
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [];
+    }
+}

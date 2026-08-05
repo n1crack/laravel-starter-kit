@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Enums\TeamRole;
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -18,13 +19,13 @@ final readonly class AcceptTeamInvitation
      */
     public function handle(TeamInvitation $invitation, User $user): bool
     {
-        if (! hash_equals($invitation->email, $user->email)) {
+        $team = $invitation->team;
+
+        if (! $team instanceof Team || ! hash_equals($invitation->email, $user->email)) {
             return false;
         }
 
-        return DB::transaction(function () use ($invitation, $user): bool {
-            $team = $invitation->team;
-
+        return DB::transaction(function () use ($invitation, $team, $user): bool {
             if (! $user->belongsToTeam($team)) {
                 $team->members()->attach($user, [
                     'role' => (TeamRole::tryFrom($invitation->role) ?? TeamRole::Member)->value,

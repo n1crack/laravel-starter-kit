@@ -133,3 +133,18 @@ it('re-applies nothing when a deleting patch already ran', function (): void {
 
     expect($this->files->get($file))->toBe("<?php\n\nreturn [];\n");
 });
+
+it('applies a shrinking patch instead of mistaking it for done', function (): void {
+    $file = $this->basePath.'/config/shrink.php';
+    $this->files->ensureDirectoryExists($this->basePath.'/config');
+    $this->files->put($file, "<?php\n\nuse A;\nuse B;\n");
+
+    // The replacement is a substring of the original, so testing for its
+    // presence would wrongly report the edit as already applied.
+    $patch = ['config/shrink.php' => [["use A;\nuse B;", 'use A;']]];
+
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+
+    expect($this->files->get($file))->toBe("<?php\n\nuse A;\n");
+});

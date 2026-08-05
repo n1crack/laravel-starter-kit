@@ -20,7 +20,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-foreach (config('tenancy.central_domains', []) as $centralDomain) {
+$centralDomains = config('tenancy.central_domains');
+
+foreach (is_array($centralDomains) ? $centralDomains : [] as $centralDomain) {
+    if (! is_string($centralDomain)) {
+        continue;
+    }
+
     Route::domain($centralDomain)->group(function (): void {
         Route::get('/', fn (): string => 'Nothing is served on the central domain.');
     });

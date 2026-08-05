@@ -44,9 +44,7 @@ final readonly class TeamInvitationController
         #[CurrentUser] User $user,
         AcceptTeamInvitation $action,
     ): RedirectResponse {
-        if (! $action->handle($invitation, $user)) {
-            throw new HttpException(403, 'This invitation was sent to a different address.');
-        }
+        throw_unless($action->handle($invitation, $user), HttpException::class, 403, 'This invitation was sent to a different address.');
 
         return to_route('teams.index');
     }

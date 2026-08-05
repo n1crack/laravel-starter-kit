@@ -9,15 +9,15 @@ use Illuminate\Filesystem\Filesystem;
 final readonly class InstallTenancy
 {
     /**
+     * The tenancy package the stubs were written against.
+     */
+    public const string PACKAGE = 'stancl/tenancy';
+
+    /**
      * Edits applied to files the starter kit already ships.
      *
      * @var array<string, list<array{string, string}>>
      */
-    /**
-     * The tenancy package version the stubs were written against.
-     */
-    public const string PACKAGE = 'stancl/tenancy';
-
     private const array PATCHES = [
         // Tenancy is opt-in, so the package is only required by installs that
         // asked for it. Composer still has to be run afterwards.
@@ -46,7 +46,7 @@ final readonly class InstallTenancy
                 "        \$this->freezeTime();\n\n        foreach (RoleEnum::cases() as \$role) {\n"
                     ."            Role::findOrCreate(\$role->value);\n        }\n    })",
                 "        \$this->freezeTime();\n\n"
-                    ."        \$tenant = Tenant::create();\n"
+                    ."        \$tenant = Tenant::query()->create();\n"
                     ."        \$tenant->domains()->create(['domain' => 'test']);\n"
                     ."        tenancy()->initialize(\$tenant);\n\n"
                     ."        URL::forceRootUrl('http://test.localhost');\n\n"

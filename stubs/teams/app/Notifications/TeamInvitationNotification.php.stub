@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,9 +31,12 @@ final class TeamInvitationNotification extends Notification implements ShouldQue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $team = $this->invitation->team;
+        $name = $team instanceof Team ? $team->name : 'the team';
+
         return (new MailMessage)
-            ->subject('You have been invited to join '.$this->invitation->team->name)
-            ->line('You have been invited to join the '.$this->invitation->team->name.' team.')
+            ->subject('You have been invited to join '.$name)
+            ->line('You have been invited to join the '.$name.' team.')
             ->action('Accept invitation', URL::signedRoute('team-invitations.update', [
                 'invitation' => $this->invitation,
             ]))

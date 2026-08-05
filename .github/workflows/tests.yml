@@ -157,5 +157,16 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      # The kit's own linters never see `stubs/`, so the generated application
+      # is where the stub code first meets Pint, Rector and PHPStan. Without
+      # this a fresh install could ship a red `composer test`.
+      - name: Lint the generated application
+        run: |
+          vendor/bin/pint --test
+          vendor/bin/rector --dry-run
+          vendor/bin/phpstan analyse --no-progress
+
       - name: Test the generated application
-        run: php artisan test --testsuite=Feature,Unit
+        run: |
+          vendor/bin/pest --type-coverage --min=100
+          php artisan test --testsuite=Feature,Unit
