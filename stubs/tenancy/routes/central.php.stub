@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Central Routes
+|--------------------------------------------------------------------------
+|
+| Routes served on the central domains. Tenants are administered from a
+| separate application, so there is deliberately very little here: the
+| application itself only ever runs inside a tenant.
+|
+*/
+
+Route::get('/', fn (): string => 'Nothing is served on the central domain.')->name('central.home');

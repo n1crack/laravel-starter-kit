@@ -13,11 +13,48 @@ final readonly class InstallTenancy
      *
      * @var array<string, list<array{string, string}>>
      */
+    /**
+     * The tenancy package version the stubs were written against.
+     */
+    public const string PACKAGE = 'stancl/tenancy';
+
     private const array PATCHES = [
+        // Tenancy is opt-in, so the package is only required by installs that
+        // asked for it. Composer still has to be run afterwards.
+        'composer.json' => [
+            [
+                '"spatie/laravel-permission": "^8.3"',
+                "\"spatie/laravel-permission\": \"^8.3\",\n        \"stancl/tenancy\": \"^3.10\"",
+            ],
+        ],
+
         'bootstrap/providers.php' => [
             [
                 '    App\\Providers\\FortifyServiceProvider::class,',
                 "    App\\Providers\\FortifyServiceProvider::class,\n    App\\Providers\\TenancyServiceProvider::class,",
+            ],
+        ],
+
+        // The kit's own routes move behind tenant identification, so the
+        // central domains are left serving `routes/central.php`. The tenant
+        // route file requires web.php and admin.php from inside the tenancy
+        // middleware group, which is why neither is rewritten here.
+        'bootstrap/app.php' => [
+            [
+                "use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;\nuse Illuminate\\Support\\Facades\\Route;",
+                'use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;',
+            ],
+            [
+                "        web: __DIR__.'/../routes/web.php',\n"
+                    ."        commands: __DIR__.'/../routes/console.php',\n"
+                    ."        then: function (): void {\n"
+                    ."            Route::middleware(['web', 'auth', 'verified', 'role:admin'])\n"
+                    ."                ->prefix('admin')\n"
+                    ."                ->name('admin.')\n"
+                    ."                ->group(base_path('routes/admin.php'));\n"
+                    ."        },\n",
+                "        web: __DIR__.'/../routes/central.php',\n"
+                    ."        commands: __DIR__.'/../routes/console.php',\n",
             ],
         ],
     ];

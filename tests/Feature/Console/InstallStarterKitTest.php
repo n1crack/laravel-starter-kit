@@ -37,6 +37,8 @@ beforeEach(function (): void {
         'config/permission.php',
         'app/Http/Middleware/HandleInertiaRequests.php',
         'bootstrap/providers.php',
+        'bootstrap/app.php',
+        'composer.json',
     ];
 
     foreach ($patched as $file) {
@@ -118,6 +120,40 @@ it('registers the tenancy service provider', function (): void {
 
     expect($this->files->get($this->scratch.'/bootstrap/providers.php'))
         ->toContain('App\Providers\TenancyServiceProvider::class,');
+});
+
+it('requires the tenancy package and says composer still has to run', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])
+        ->expectsOutputToContain('Run "composer update" to install stancl/tenancy.')
+        ->assertSuccessful();
+
+    expect($this->files->get($this->scratch.'/composer.json'))->toContain('"stancl/tenancy": "^3.10"');
+});
+
+it('leaves the tenancy package out when tenancy is declined', function (): void {
+    $this->artisan('starter-kit:install', ['--no-interaction' => true])->assertSuccessful();
+
+    expect($this->files->get($this->scratch.'/composer.json'))->not->toContain('stancl/tenancy');
+});
+
+it('hands the kit routes over to the tenant context', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])
+        ->assertSuccessful();
+
+    $bootstrap = $this->files->get($this->scratch.'/bootstrap/app.php');
+
+    // The central domains keep serving only central.php; web.php and admin.php
+    // are required from inside the tenant group instead of being rewritten.
+    expect($bootstrap)
+        ->toContain("web: __DIR__.'/../routes/central.php'")
+        ->not->toContain('routes/web.php')
+        ->not->toContain('routes/admin.php')
+        ->and($this->files->get($this->scratch.'/routes/tenant.php'))
+        ->toContain("require base_path('routes/web.php');")
+        ->toContain("->group(base_path('routes/admin.php'));")
+        ->toContain('InitializeTenancyByDomainOrSubdomain::class')
+        ->and($this->scratch.'/routes/central.php')->toBeReadableFile()
+        ->and($this->scratch.'/app/Models/Tenant.php')->toBeReadableFile();
 });
 
 it('skips the prompts it was given options for', function (): void {

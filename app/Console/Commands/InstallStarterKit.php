@@ -65,6 +65,7 @@ final class InstallStarterKit extends Command
             );
 
             $this->components->info('Multi-tenancy added.');
+            $this->components->warn('Run "composer update" to install '.InstallTenancy::PACKAGE.'.');
         }
 
         $driver = $this->database();
