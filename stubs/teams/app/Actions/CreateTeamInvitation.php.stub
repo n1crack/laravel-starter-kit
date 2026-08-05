@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Notifications\TeamInvitationNotification;
+use Illuminate\Support\Facades\Notification;
+
+final readonly class CreateTeamInvitation
+{
+    public function handle(Team $team, string $email, TeamRole $role): TeamInvitation
+    {
+        $invitation = $team->invitations()->create([
+            'email' => $email,
+            'role' => $role->value,
+        ]);
+
+        Notification::route('mail', $email)
+            ->notify(new TeamInvitationNotification($invitation));
+
+        return $invitation;
+    }
+}

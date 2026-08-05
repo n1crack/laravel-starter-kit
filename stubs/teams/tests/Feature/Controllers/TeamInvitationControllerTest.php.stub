@@ -1,0 +1,110 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Models\User;
+use App\Notifications\TeamInvitationNotification;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
+
+beforeEach(function (): void {
+    Notification::fake();
+
+    $this->owner = User::factory()->create();
+    $this->team = Team::factory()->create(['owner_id' => $this->owner->id]);
+    $this->team->members()->attach($this->owner, ['role' => TeamRole::Owner->value]);
+});
+
+it('invites someone and notifies them', function (): void {
+    $response = $this->actingAs($this->owner)->post(
+        route('team-invitations.store', $this->team),
+        ['email' => 'teammate@example.com', 'role' => TeamRole::Member->value],
+    );
+
+    $response->assertRedirect(route('teams.edit', $this->team));
+
+    expect($this->team->invitations()->where('email', 'teammate@example.com')->exists())->toBeTrue();
+
+    Notification::assertSentOnDemand(TeamInvitationNotification::class);
+});
+
+it('refuses to invite the same address twice', function (): void {
+    TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'teammate@example.com',
+    ]);
+
+    $response = $this->actingAs($this->owner)->post(
+        route('team-invitations.store', $this->team),
+        ['email' => 'teammate@example.com', 'role' => TeamRole::Member->value],
+    );
+
+    $response->assertSessionHasErrors('email');
+});
+
+it('refuses to invite someone straight to ownership', function (): void {
+    $response = $this->actingAs($this->owner)->post(
+        route('team-invitations.store', $this->team),
+        ['email' => 'teammate@example.com', 'role' => TeamRole::Owner->value],
+    );
+
+    $response->assertSessionHasErrors('role');
+});
+
+it('joins the team when the invited user accepts', function (): void {
+    $invited = User::factory()->create(['email' => 'teammate@example.com']);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'teammate@example.com',
+        'role' => TeamRole::Admin->value,
+    ]);
+
+    $response = $this->actingAs($invited)->get(
+        URL::signedRoute('team-invitations.update', ['invitation' => $invitation]),
+    );
+
+    $response->assertRedirect(route('teams.index'));
+
+    expect($this->team->roleFor($invited))->toBe(TeamRole::Admin)
+        ->and($invited->refresh()->current_team_id)->toBe($this->team->id)
+        ->and(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
+});
+
+it('refuses an invitation addressed to someone else', function (): void {
+    $other = User::factory()->create(['email' => 'someone-else@example.com']);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'teammate@example.com',
+    ]);
+
+    $this->actingAs($other)->get(
+        URL::signedRoute('team-invitations.update', ['invitation' => $invitation]),
+    )->assertForbidden();
+
+    expect($this->team->hasMember($other))->toBeFalse();
+});
+
+it('rejects an unsigned invitation link', function (): void {
+    $invitation = TeamInvitation::factory()->create(['team_id' => $this->team->id]);
+
+    $this->actingAs($this->owner)
+        ->get(route('team-invitations.update', $invitation))
+        ->assertForbidden();
+});
+
+it('cancels a pending invitation', function (): void {
+    $invitation = TeamInvitation::factory()->create(['team_id' => $this->team->id]);
+
+    $response = $this->actingAs($this->owner)->delete(
+        route('team-invitations.destroy', ['team' => $this->team, 'invitation' => $invitation]),
+    );
+
+    $response->assertRedirect(route('teams.edit', $this->team));
+
+    expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
+});

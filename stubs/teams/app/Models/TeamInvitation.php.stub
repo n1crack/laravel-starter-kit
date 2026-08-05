@@ -18,18 +18,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read CarbonInterface $created_at
  * @property-read CarbonInterface $updated_at
  */
+#[\Illuminate\Database\Eloquent\Attributes\Fillable([
+    'team_id',
+    'email',
+    'role',
+])]
 final class TeamInvitation extends Model
 {
     /**
      * @use HasFactory<TeamInvitationFactory>
      */
     use HasFactory;
-
-    protected $fillable = [
-        'team_id',
-        'email',
-        'role',
-    ];
 
     /**
      * @return BelongsTo<Team, $this>

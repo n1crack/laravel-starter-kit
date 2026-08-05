@@ -4,17 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
-use Illuminate\Filesystem\Filesystem;
-use RuntimeException;
-
 final readonly class InstallTeamSupport
 {
     /**
-     * Edits applied to files the starter kit already ships, keyed by path.
-     *
-     * Each entry is a [search, replace] pair. The search string must appear
-     * exactly once; anything else means the file drifted from what the stubs
-     * were written against, and installing would corrupt it.
+     * Edits applied to files the starter kit already ships.
      *
      * @var array<string, list<array{string, string}>>
      */
@@ -24,16 +17,72 @@ final readonly class InstallTeamSupport
                 'use Carbon\\CarbonInterface;',
                 "use App\\Models\\Concerns\\HasTeams;\nuse Carbon\\CarbonInterface;",
             ],
+            // spatie/laravel-permission also defines `teams()`, meaning the
+            // teams a user holds a role in. Membership is the one the UI wants,
+            // so the collision is resolved explicitly and theirs kept aliased.
             [
                 'use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;',
-                'use HasFactory, HasRoles, HasTeams, Notifiable, TwoFactorAuthenticatable;',
+                "use HasFactory, HasRoles, HasTeams, Notifiable, TwoFactorAuthenticatable {\n"
+                    ."        HasTeams::teams insteadof HasRoles;\n"
+                    ."        HasRoles::teams as roleTeams;\n"
+                    .'    }',
+            ],
+            [
+                ' * @property-read CarbonInterface|null $email_verified_at',
+                " * @property-read CarbonInterface|null \$email_verified_at\n * @property-read int|null \$current_team_id",
+            ],
+            [
+                "            'email_verified_at' => 'datetime',",
+                "            'email_verified_at' => 'datetime',\n            'current_team_id' => 'integer',",
             ],
         ],
 
-        'config/permission.php' => [
+        // Hung off `web.php` rather than `bootstrap/app.php` on purpose: when
+        // tenancy is also installed, `web.php` is required from inside the
+        // tenant route group, so the team routes follow it into the tenant
+        // context without the two installers fighting over the same file.
+        'routes/web.php' => [
             [
-                "'teams' => false,",
-                "'teams' => true,",
+                "    Route::get('dashboard', fn () => Inertia::render('dashboard'))->name('dashboard');",
+                "    Route::get('dashboard', fn () => Inertia::render('dashboard'))->name('dashboard');\n\n"
+                    ."    require __DIR__.'/teams.php';",
+            ],
+        ],
+
+        'resources/js/types/index.d.ts' => [
+            [
+                "export interface Auth {\n    user: User;\n    roles: string[];\n}",
+                "export interface Team {\n    id: number;\n    name: string;\n}\n\n"
+                    ."export interface Auth {\n    user: User;\n    roles: string[];\n"
+                    ."    currentTeam: Team | null;\n    teams: Team[];\n}",
+            ],
+        ],
+
+        'resources/js/components/app-sidebar.tsx' => [
+            [
+                '            <SidebarHeader>',
+                "            <SidebarHeader>\n                <TeamSwitcher />",
+            ],
+            [
+                "import { NavMain } from '@/components/nav-main';",
+                "import { NavMain } from '@/components/nav-main';\nimport { TeamSwitcher } from '@/components/team-switcher';",
+            ],
+        ],
+
+        // A factory-made user only carries the attributes the factory set, and
+        // the kit runs with `preventAccessingMissingAttributes`, so reading the
+        // new column off one would throw without this.
+        'database/factories/UserFactory.php' => [
+            [
+                "            'email_verified_at' => now(),",
+                "            'email_verified_at' => now(),\n            'current_team_id' => null,",
+            ],
+        ],
+
+        'tests/Unit/Models/UserTest.php' => [
+            [
+                "            'updated_at',\n        ]);",
+                "            'updated_at',\n            'current_team_id',\n        ]);",
             ],
         ],
 
@@ -47,75 +96,16 @@ final readonly class InstallTeamSupport
         ],
     ];
 
-    public function __construct(private Filesystem $files)
-    {
+    public function __construct(
+        private PublishStubs $publishStubs,
+        private PatchFiles $patchFiles,
+    ) {
         //
     }
 
-    /**
-     * Copy every team stub into the application and wire it into the files
-     * the starter kit already ships.
-     */
     public function handle(string $basePath, string $stubPath): void
     {
-        $this->publishStubs($basePath, $stubPath);
-        $this->patch($basePath);
-    }
-
-    /**
-     * Mirror `stubs/teams` into the application, dropping the `.stub` suffix.
-     *
-     * Migrations are date-prefixed on the way out so they run after the
-     * migrations the starter kit already ships.
-     */
-    private function publishStubs(string $basePath, string $stubPath): void
-    {
-        throw_unless($this->files->isDirectory($stubPath), RuntimeException::class, "Team stubs are missing from [{$stubPath}].");
-
-        foreach ($this->files->allFiles($stubPath) as $file) {
-            $relative = mb_substr($file->getPathname(), mb_strlen($stubPath) + 1);
-            $target = $basePath.DIRECTORY_SEPARATOR.$this->targetPath($relative);
-
-            $this->files->ensureDirectoryExists(dirname($target));
-            $this->files->put($target, $file->getContents());
-        }
-    }
-
-    private function targetPath(string $relative): string
-    {
-        $relative = (string) preg_replace('/\.stub$/', '', $relative);
-
-        if (str_starts_with($relative, 'database/migrations/')) {
-            return str_replace(
-                'database/migrations/',
-                'database/migrations/'.now()->format('Y_m_d_His').'_',
-                $relative,
-            );
-        }
-
-        return $relative;
-    }
-
-    private function patch(string $basePath): void
-    {
-        foreach (self::PATCHES as $file => $edits) {
-            $path = $basePath.DIRECTORY_SEPARATOR.$file;
-
-            throw_unless($this->files->exists($path), RuntimeException::class, "Cannot add team support: [{$file}] is missing.");
-
-            $contents = $this->files->get($path);
-
-            foreach ($edits as [$search, $replace]) {
-                if (str_contains($contents, $replace)) {
-                    continue;
-                }
-
-                throw_if(mb_substr_count($contents, $search) !== 1, RuntimeException::class, "Cannot add team support: [{$file}] does not match what the stubs expect.");
-
-                $contents = str_replace($search, $replace, $contents);
-            }
-
-            $this->files->put($path, $contents);
-        }
+        $this->publishStubs->handle($stubPath, $basePath);
+        $this->patchFiles->handle($basePath, self::PATCHES);
     }
 }

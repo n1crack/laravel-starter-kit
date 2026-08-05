@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+final class CreateTeamInvitationRequest extends FormRequest
+{
+    /**
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        $team = $this->route('team');
+        assert($team instanceof Team);
+
+        return [
+            'email' => [
+                'required',
+                'string',
+                'lowercase',
+                'email',
+                'max:255',
+                Rule::unique('team_invitations')->where('team_id', $team->id),
+            ],
+
+            'role' => ['required', Rule::enum(TeamRole::class)->only(TeamRole::assignable())],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.unique' => 'That address has already been invited to this team.',
+        ];
+    }
+}

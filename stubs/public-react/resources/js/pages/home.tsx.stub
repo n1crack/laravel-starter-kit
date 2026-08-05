@@ -1,0 +1,48 @@
+import ContactForm from '@/components/contact-form';
+import PublicLayout from '@/layouts/public-layout';
+import { login, register } from '@/routes';
+import { Head, Link } from '@inertiajs/react';
+
+export default function Home() {
+    return (
+        <PublicLayout>
+            <Head title="Welcome" />
+
+            <section className="mx-auto max-w-6xl px-6 py-24 text-center">
+                <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                    Build your next idea with a solid foundation
+                </h1>
+                <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-balance">
+                    Public pages, admin and user panels all powered by Inertia &
+                    React.
+                </p>
+                <div className="mt-10 flex items-center justify-center gap-4">
+                    <Link
+                        href={register()}
+                        className="bg-foreground text-background rounded-md px-6 py-2.5 font-medium hover:opacity-90"
+                    >
+                        Get started
+                    </Link>
+                    <Link
+                        href={login()}
+                        className="border-border rounded-md border px-6 py-2.5 font-medium"
+                    >
+                        Log in
+                    </Link>
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-xl px-6 pb-24">
+                <h2 className="text-center text-2xl font-semibold">
+                    Contact us
+                </h2>
+                <p className="text-muted-foreground mt-2 text-center text-sm">
+                    This form posts with Inertia — no page reload needed.
+                </p>
+                <div className="mt-8">
+                    <ContactForm />
+                </div>
+            </section>
+        </PublicLayout>
+    );
+}

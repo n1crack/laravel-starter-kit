@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+
+final readonly class DeleteTeamMember
+{
+    /**
+     * Remove a member from a team.
+     *
+     * The owner cannot be removed — deleting the team is the way to end it.
+     *
+     * @return bool whether the member was removed
+     */
+    public function handle(Team $team, User $member): bool
+    {
+        if ($team->owner_id === $member->id || ! $team->hasMember($member)) {
+            return false;
+        }
+
+        DB::transaction(function () use ($team, $member): void {
+            $team->members()->detach($member);
+
+            if ($member->current_team_id === $team->id) {
+                $member->forceFill(['current_team_id' => null])->save();
+            }
+        });
+
+        return true;
+    }
+}

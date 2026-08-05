@@ -11,7 +11,17 @@ beforeEach(function (): void {
 
     // A miniature copy of the files the stubs patch, kept byte-identical to the
     // real ones so the test fails when either side drifts.
-    foreach (['app/Models/User.php', 'config/permission.php', 'app/Http/Middleware/HandleInertiaRequests.php'] as $file) {
+    $patched = [
+        'app/Models/User.php',
+        'database/factories/UserFactory.php',
+        'tests/Unit/Models/UserTest.php',
+        'app/Http/Middleware/HandleInertiaRequests.php',
+        'routes/web.php',
+        'resources/js/components/app-sidebar.tsx',
+        'resources/js/types/index.d.ts',
+    ];
+
+    foreach ($patched as $file) {
         $this->files->ensureDirectoryExists($this->basePath.'/'.dirname($file));
         $this->files->copy(base_path($file), $this->basePath.'/'.$file);
     }
@@ -23,7 +33,7 @@ afterEach(function (): void {
 
 function installTeams(string $basePath, ?string $stubPath = null): void
 {
-    new InstallTeamSupport(new Filesystem)->handle($basePath, $stubPath ?? base_path('stubs/teams'));
+    resolve(InstallTeamSupport::class)->handle($basePath, $stubPath ?? base_path('stubs/teams'));
 }
 
 it('publishes every stub without the stub suffix', function (): void {
@@ -48,13 +58,33 @@ it('adds the teams trait to the user model', function (): void {
 
     expect($this->files->get($this->basePath.'/app/Models/User.php'))
         ->toContain('use App\Models\Concerns\HasTeams;')
-        ->toContain('use HasFactory, HasRoles, HasTeams, Notifiable, TwoFactorAuthenticatable;');
+        ->toContain('HasTeams::teams insteadof HasRoles;')
+        ->toContain('HasRoles::teams as roleTeams;');
 });
 
-it('turns on team scoped permissions', function (): void {
+it('registers the team routes behind auth', function (): void {
     installTeams($this->basePath);
 
-    expect($this->files->get($this->basePath.'/config/permission.php'))->toContain("'teams' => true,");
+    expect($this->files->get($this->basePath.'/routes/web.php'))
+        ->toContain("require __DIR__.'/teams.php';")
+        ->and($this->basePath.'/routes/teams.php')->toBeReadableFile();
+});
+
+it('puts the team switcher in the user sidebar', function (): void {
+    installTeams($this->basePath);
+
+    expect($this->files->get($this->basePath.'/resources/js/components/app-sidebar.tsx'))
+        ->toContain("import { TeamSwitcher } from '@/components/team-switcher';")
+        ->toContain('<TeamSwitcher />')
+        ->and($this->basePath.'/resources/js/components/team-switcher.tsx')->toBeReadableFile();
+});
+
+it('adds the current team column to the user model', function (): void {
+    installTeams($this->basePath);
+
+    expect($this->files->get($this->basePath.'/app/Models/User.php'))
+        ->toContain('@property-read int|null $current_team_id')
+        ->toContain("'current_team_id' => 'integer',");
 });
 
 it('shares the current team with inertia', function (): void {
@@ -77,16 +107,44 @@ it('can be run twice without duplicating the patches', function (): void {
 
 it('fails when the stubs are missing', function (): void {
     installTeams($this->basePath, $this->basePath.'/nowhere');
-})->throws(RuntimeException::class, 'Team stubs are missing');
+})->throws(RuntimeException::class, 'Stubs are missing from');
 
 it('fails when a patched file is missing', function (): void {
-    $this->files->delete($this->basePath.'/config/permission.php');
+    $this->files->delete($this->basePath.'/app/Models/User.php');
 
     installTeams($this->basePath);
-})->throws(RuntimeException::class, '[config/permission.php] is missing');
+})->throws(RuntimeException::class, 'Cannot patch [app/Models/User.php]');
 
 it('fails when a patched file has drifted from the stubs', function (): void {
-    $this->files->put($this->basePath.'/config/permission.php', '<?php return [];');
+    $this->files->put($this->basePath.'/app/Models/User.php', '<?php class User {}');
 
     installTeams($this->basePath);
 })->throws(RuntimeException::class, 'does not match what the stubs expect');
+
+it('re-applies nothing when a deleting patch already ran', function (): void {
+    $file = $this->basePath.'/config/scratch.php';
+    $this->files->ensureDirectoryExists($this->basePath.'/config');
+    $this->files->put($file, "<?php\n\nreturn ['teams' => false];\n");
+
+    $patch = ['config/scratch.php' => [["'teams' => false", '']]];
+
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+
+    expect($this->files->get($file))->toBe("<?php\n\nreturn [];\n");
+});
+
+it('applies a shrinking patch instead of mistaking it for done', function (): void {
+    $file = $this->basePath.'/config/shrink.php';
+    $this->files->ensureDirectoryExists($this->basePath.'/config');
+    $this->files->put($file, "<?php\n\nuse A;\nuse B;\n");
+
+    // The replacement is a substring of the original, so testing for its
+    // presence would wrongly report the edit as already applied.
+    $patch = ['config/shrink.php' => [["use A;\nuse B;", 'use A;']]];
+
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+
+    expect($this->files->get($file))->toBe("<?php\n\nuse A;\n");
+});

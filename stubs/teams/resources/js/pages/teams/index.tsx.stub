@@ -1,0 +1,77 @@
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
+import { edit, store } from '@/routes/teams';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { type FormEvent } from 'react';
+
+interface TeamRow {
+    id: number;
+    name: string;
+    owner_id: number;
+}
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Teams', href: '/teams' },
+];
+
+export default function TeamsIndex({ teams }: { teams: TeamRow[] }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+    });
+
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+
+        post(store().url, { onSuccess: () => reset() });
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Teams" />
+
+            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
+                <form onSubmit={submit} className="flex items-start gap-2">
+                    <div className="flex-1 sm:max-w-xs">
+                        <Input
+                            value={data.name}
+                            onChange={(event) =>
+                                setData('name', event.target.value)
+                            }
+                            placeholder="New team name"
+                        />
+                        {errors.name && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                {errors.name}
+                            </p>
+                        )}
+                    </div>
+                    <Button type="submit" disabled={processing}>
+                        Create team
+                    </Button>
+                </form>
+
+                <ul className="divide-border divide-y rounded-md border">
+                    {teams.map((team) => (
+                        <li
+                            key={team.id}
+                            className="flex items-center justify-between px-4 py-3"
+                        >
+                            <span className="font-medium">{team.name}</span>
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={edit(team.id)}>Manage</Link>
+                            </Button>
+                        </li>
+                    ))}
+
+                    {teams.length === 0 && (
+                        <li className="text-muted-foreground px-4 py-6 text-center text-sm">
+                            You do not belong to any teams yet.
+                        </li>
+                    )}
+                </ul>
+            </div>
+        </AppLayout>
+    );
+}

@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Central Routes
+|--------------------------------------------------------------------------
+|
+| Routes served on the central domains. Tenants are administered from a
+| separate application, so there is deliberately very little here: this
+| application only ever runs inside a tenant.
+|
+| Each route is constrained to a central domain. Without that they would
+| share a URI with the tenant routes, which are registered later and would
+| win — leaving the central domains answering with a tenant route that
+| `PreventAccessFromCentralDomains` then refuses.
+|
+*/
+
+$centralDomains = config('tenancy.central_domains');
+
+foreach (is_array($centralDomains) ? $centralDomains : [] as $centralDomain) {
+    if (! is_string($centralDomain)) {
+        continue;
+    }
+
+    Route::domain($centralDomain)->group(function (): void {
+        Route::get('/', fn (): string => 'Nothing is served on the central domain.');
+    });
+}

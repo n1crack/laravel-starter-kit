@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Actions\DeleteTeamMember;
+use App\Actions\UpdateTeamMember;
+use App\Enums\TeamRole;
+use App\Http\Requests\UpdateTeamMemberRequest;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
+
+final readonly class TeamMemberController
+{
+    public function update(
+        UpdateTeamMemberRequest $request,
+        Team $team,
+        User $member,
+        UpdateTeamMember $action,
+    ): RedirectResponse {
+        Gate::authorize('manageMembers', $team);
+
+        $role = TeamRole::from($request->string('role')->value());
+
+        if (! $action->handle($team, $member, $role)) {
+            throw ValidationException::withMessages([
+                'role' => "The team owner's role cannot be changed.",
+            ]);
+        }
+
+        return to_route('teams.edit', $team);
+    }
+
+    public function destroy(Team $team, User $member, DeleteTeamMember $action): RedirectResponse
+    {
+        Gate::authorize('manageMembers', $team);
+
+        if (! $action->handle($team, $member)) {
+            throw ValidationException::withMessages([
+                'member' => 'The team owner cannot be removed from the team.',
+            ]);
+        }
+
+        return to_route('teams.edit', $team);
+    }
+}

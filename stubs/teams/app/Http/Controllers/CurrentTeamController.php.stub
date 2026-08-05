@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Actions\SwitchTeam;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+final readonly class CurrentTeamController
+{
+    public function update(Team $team, #[CurrentUser] User $user, SwitchTeam $action): RedirectResponse
+    {
+        throw_unless($action->handle($user, $team), HttpException::class, 403, 'You do not belong to that team.');
+
+        return back();
+    }
+}

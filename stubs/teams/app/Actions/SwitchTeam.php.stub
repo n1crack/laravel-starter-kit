@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Models\Team;
+use App\Models\User;
+
+final readonly class SwitchTeam
+{
+    /**
+     * Make the given team the user's current one.
+     *
+     * @return bool whether the user belongs to the team, and the switch happened
+     */
+    public function handle(User $user, Team $team): bool
+    {
+        if (! $user->belongsToTeam($team)) {
+            return false;
+        }
+
+        $user->forceFill(['current_team_id' => $team->id])->save();
+
+        return true;
+    }
+}

@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+
+final readonly class AcceptTeamInvitation
+{
+    /**
+     * Join the invited user to the team and consume the invitation.
+     *
+     * @return bool whether the invitation was for this user, and was accepted
+     */
+    public function handle(TeamInvitation $invitation, User $user): bool
+    {
+        $team = $invitation->team;
+
+        if (! $team instanceof Team || ! hash_equals($invitation->email, $user->email)) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($invitation, $team, $user): bool {
+            if (! $user->belongsToTeam($team)) {
+                $team->members()->attach($user, [
+                    'role' => (TeamRole::tryFrom($invitation->role) ?? TeamRole::Member)->value,
+                ]);
+            }
+
+            if ($user->current_team_id === null) {
+                $user->forceFill(['current_team_id' => $team->id])->save();
+            }
+
+            $invitation->delete();
+
+            return true;
+        });
+    }
+}

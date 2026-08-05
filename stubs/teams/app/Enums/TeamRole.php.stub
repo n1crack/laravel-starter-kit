@@ -10,6 +10,17 @@ enum TeamRole: string
     case Admin = 'admin';
     case Member = 'member';
 
+    /**
+     * Roles that may be handed out to a member, so ownership cannot be granted
+     * by way of an invitation or a role change.
+     *
+     * @return list<self>
+     */
+    public static function assignable(): array
+    {
+        return [self::Admin, self::Member];
+    }
+
     public function label(): string
     {
         return match ($this) {
@@ -25,16 +36,5 @@ enum TeamRole: string
     public function managesMembers(): bool
     {
         return $this === self::Owner || $this === self::Admin;
-    }
-
-    /**
-     * Roles that may be handed out to a member, so ownership cannot be granted
-     * by way of an invitation or a role change.
-     *
-     * @return list<self>
-     */
-    public static function assignable(): array
-    {
-        return [self::Admin, self::Member];
     }
 }

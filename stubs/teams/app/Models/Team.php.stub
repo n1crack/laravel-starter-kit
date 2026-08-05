@@ -21,18 +21,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read CarbonInterface $created_at
  * @property-read CarbonInterface $updated_at
  */
+#[\Illuminate\Database\Eloquent\Attributes\Fillable([
+    'name',
+    'owner_id',
+    'personal_team',
+])]
 final class Team extends Model
 {
     /**
      * @use HasFactory<TeamFactory>
      */
     use HasFactory;
-
-    protected $fillable = [
-        'name',
-        'owner_id',
-        'personal_team',
-    ];
 
     /**
      * @return BelongsTo<User, $this>
@@ -65,15 +64,13 @@ final class Team extends Model
         return $this->members()->whereKey($user->id)->exists();
     }
 
+    /**
+     * Read the role straight off the pivot rather than through the loaded
+     * relation, which types it as `mixed`.
+     */
     public function roleFor(User $user): ?TeamRole
     {
-        $member = $this->members()->whereKey($user->id)->first();
-
-        if ($member === null) {
-            return null;
-        }
-
-        $role = $member->getAttribute('pivot')?->getAttribute('role');
+        $role = $this->members()->whereKey($user->id)->value('team_user.role');
 
         return is_string($role) ? TeamRole::tryFrom($role) : null;
     }

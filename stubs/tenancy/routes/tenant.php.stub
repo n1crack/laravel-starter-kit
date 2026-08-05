@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Route;
+use Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
+/*
+|--------------------------------------------------------------------------
+| Tenant Routes
+|--------------------------------------------------------------------------
+|
+| Everything the starter kit serves belongs to a tenant, so the kit's own
+| route files are required from inside this group rather than copied into
+| it. They keep working unchanged; they simply stop resolving on the
+| central domains.
+|
+| Loaded by App\Providers\TenancyServiceProvider.
+|
+*/
+
+Route::middleware([
+    'web',
+    InitializeTenancyByDomainOrSubdomain::class,
+    PreventAccessFromCentralDomains::class,
+])->group(function (): void {
+    require base_path('routes/web.php');
+
+    Route::middleware(['auth', 'verified', 'role:admin'])
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(base_path('routes/admin.php'));
+});

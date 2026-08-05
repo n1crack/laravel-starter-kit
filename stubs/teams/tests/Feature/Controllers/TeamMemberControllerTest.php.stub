@@ -1,0 +1,81 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+
+beforeEach(function (): void {
+    $this->owner = User::factory()->create();
+    $this->team = Team::factory()->create(['owner_id' => $this->owner->id]);
+    $this->team->members()->attach($this->owner, ['role' => TeamRole::Owner->value]);
+
+    $this->member = User::factory()->create();
+    $this->team->members()->attach($this->member, ['role' => TeamRole::Member->value]);
+});
+
+it('promotes a member', function (): void {
+    $response = $this->actingAs($this->owner)->patch(
+        route('team-members.update', ['team' => $this->team, 'member' => $this->member]),
+        ['role' => TeamRole::Admin->value],
+    );
+
+    $response->assertRedirect(route('teams.edit', $this->team));
+
+    expect($this->team->roleFor($this->member))->toBe(TeamRole::Admin);
+});
+
+it('refuses to hand out ownership through a role change', function (): void {
+    $response = $this->actingAs($this->owner)->patch(
+        route('team-members.update', ['team' => $this->team, 'member' => $this->member]),
+        ['role' => TeamRole::Owner->value],
+    );
+
+    $response->assertSessionHasErrors('role');
+
+    expect($this->team->roleFor($this->member))->toBe(TeamRole::Member);
+});
+
+it('refuses to change the owner role', function (): void {
+    $response = $this->actingAs($this->owner)->patch(
+        route('team-members.update', ['team' => $this->team, 'member' => $this->owner]),
+        ['role' => TeamRole::Member->value],
+    );
+
+    $response->assertSessionHasErrors('role');
+
+    expect($this->team->roleFor($this->owner))->toBe(TeamRole::Owner);
+});
+
+it('removes a member and clears their current team', function (): void {
+    $this->member->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $response = $this->actingAs($this->owner)->delete(
+        route('team-members.destroy', ['team' => $this->team, 'member' => $this->member]),
+    );
+
+    $response->assertRedirect(route('teams.edit', $this->team));
+
+    expect($this->team->hasMember($this->member))->toBeFalse()
+        ->and($this->member->refresh()->current_team_id)->toBeNull();
+});
+
+it('refuses to remove the owner', function (): void {
+    $response = $this->actingAs($this->owner)->delete(
+        route('team-members.destroy', ['team' => $this->team, 'member' => $this->owner]),
+    );
+
+    $response->assertSessionHasErrors('member');
+
+    expect($this->team->hasMember($this->owner))->toBeTrue();
+});
+
+it('does not let a plain member manage other members', function (): void {
+    $other = User::factory()->create();
+    $this->team->members()->attach($other, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($this->member)->delete(
+        route('team-members.destroy', ['team' => $this->team, 'member' => $other]),
+    )->assertForbidden();
+});
