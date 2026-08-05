@@ -10,9 +10,18 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Routes served on the central domains. Tenants are administered from a
-| separate application, so there is deliberately very little here: the
-| application itself only ever runs inside a tenant.
+| separate application, so there is deliberately very little here: this
+| application only ever runs inside a tenant.
+|
+| Each route is constrained to a central domain. Without that they would
+| share a URI with the tenant routes, which are registered later and would
+| win — leaving the central domains answering with a tenant route that
+| `PreventAccessFromCentralDomains` then refuses.
 |
 */
 
-Route::get('/', fn (): string => 'Nothing is served on the central domain.')->name('central.home');
+foreach (config('tenancy.central_domains', []) as $centralDomain) {
+    Route::domain($centralDomain)->group(function (): void {
+        Route::get('/', fn (): string => 'Nothing is served on the central domain.');
+    });
+}

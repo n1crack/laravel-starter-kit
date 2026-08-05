@@ -28,6 +28,37 @@ final readonly class InstallTenancy
             ],
         ],
 
+        // Every table and route the kit ships now lives inside a tenant, so
+        // the tests have to run inside one too. Creating the tenant provisions
+        // its database and runs the tenant migrations; the domain and forced
+        // root URL are what keep requests off the central domains, where
+        // `PreventAccessFromCentralDomains` would refuse them.
+        'tests/Pest.php' => [
+            [
+                'use App\\Enums\\Role as RoleEnum;',
+                "use App\\Enums\\Role as RoleEnum;\nuse App\\Models\\Tenant;",
+            ],
+            [
+                'use Illuminate\\Support\\Facades\\Process;',
+                "use Illuminate\\Support\\Facades\\Process;\nuse Illuminate\\Support\\Facades\\URL;",
+            ],
+            [
+                "        \$this->freezeTime();\n\n        foreach (RoleEnum::cases() as \$role) {\n"
+                    ."            Role::findOrCreate(\$role->value);\n        }\n    })",
+                "        \$this->freezeTime();\n\n"
+                    ."        \$tenant = Tenant::create();\n"
+                    ."        \$tenant->domains()->create(['domain' => 'test']);\n"
+                    ."        tenancy()->initialize(\$tenant);\n\n"
+                    ."        URL::forceRootUrl('http://test.localhost');\n\n"
+                    ."        foreach (RoleEnum::cases() as \$role) {\n"
+                    ."            Role::findOrCreate(\$role->value);\n        }\n    })\n"
+                    ."    ->afterEach(function (): void {\n"
+                    ."        \$tenant = tenant();\n\n"
+                    ."        tenancy()->end();\n\n"
+                    ."        \$tenant?->delete();\n    })",
+            ],
+        ],
+
         'bootstrap/providers.php' => [
             [
                 '    App\\Providers\\FortifyServiceProvider::class,',

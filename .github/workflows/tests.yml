@@ -110,6 +110,10 @@ jobs:
             options: --public=react --no-interaction
           - name: react-public-and-teams
             options: --public=react --teams --no-interaction
+          - name: tenancy
+            options: --tenancy --central-domain=localhost --no-interaction
+          - name: everything
+            options: --tenancy --teams --public=react --central-domain=localhost --no-interaction
 
     name: install (${{ matrix.name }})
 
@@ -141,11 +145,13 @@ jobs:
       - name: Install the starter kit
         run: php artisan starter-kit:install ${{ matrix.options }}
 
-      # The React public pages drop Livewire, and team support adds classes the
-      # autoloader has not seen yet.
+      # Installing changes the dependency set: the React public pages drop
+      # Livewire and tenancy adds stancl/tenancy. Scripts are skipped so the
+      # kit's `update:requirements` hook does not bump every dependency mid-run.
       - name: Refresh Dependencies
         run: |
-          composer update --no-interaction --prefer-dist
+          composer update --no-interaction --prefer-dist --no-scripts
+          php artisan package:discover
           npm install
 
       - name: Build Assets

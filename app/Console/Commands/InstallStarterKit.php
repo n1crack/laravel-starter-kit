@@ -89,6 +89,12 @@ final class InstallStarterKit extends Command
             'tests/Feature/Console',
             'tests/Unit/Actions/ConfigureDatabaseConnectionTest.php',
             'tests/Unit/Actions/InstallTeamSupportTest.php',
+
+            // Installing changes which packages exist, so the cached discovery
+            // manifest is stale and would keep pointing at a provider that has
+            // just been removed.
+            'bootstrap/cache/packages.php',
+            'bootstrap/cache/services.php',
         ]);
 
         return self::SUCCESS;

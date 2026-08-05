@@ -42,6 +42,7 @@ beforeEach(function (): void {
         'database/factories/UserFactory.php',
         'tests/Unit/Models/UserTest.php',
         'resources/js/types/index.d.ts',
+        'tests/Pest.php',
         'resources/js/components/app-sidebar.tsx',
         'routes/web.php',
         'resources/views/home.blade.php',
@@ -177,6 +178,17 @@ it('leaves the tenancy package out when tenancy is declined', function (): void 
     $this->artisan('starter-kit:install', ['--no-interaction' => true])->assertSuccessful();
 
     expect($this->files->get($this->scratch.'/composer.json'))->not->toContain('stancl/tenancy');
+});
+
+it('runs the generated tests inside a tenant', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->files->get($this->scratch.'/tests/Pest.php'))
+        ->toContain('use App\Models\Tenant;')
+        ->toContain('tenancy()->initialize($tenant);')
+        ->toContain("URL::forceRootUrl('http://test.localhost');")
+        ->toContain('tenancy()->end();');
 });
 
 it('hands the kit routes over to the tenant context', function (): void {
