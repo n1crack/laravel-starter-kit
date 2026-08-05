@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     DataTable,
+    type DataTableFeatures,
     DataTablePagination,
     type PaginationLink,
 } from '@/components/ui/data-table';
@@ -49,7 +50,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const columns: ColumnDef<UserRow>[] = [
+const columns: ColumnDef<DataTableFeatures, UserRow>[] = [
     {
         accessorKey: 'name',
         header: ({ column }) => (
