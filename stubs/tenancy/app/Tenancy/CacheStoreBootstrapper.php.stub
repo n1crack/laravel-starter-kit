@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tenancy;
+
+use Illuminate\Contracts\Foundation\Application;
+use Stancl\Tenancy\Contracts\TenancyBootstrapper;
+use Stancl\Tenancy\Contracts\Tenant;
+
+/**
+ * Keeps the cache and the session inside the tenant they belong to.
+ *
+ * Their tables live in the tenant database, so swapping the connection ought
+ * to be enough. It is not: both the cache store and the session handler are
+ * resolved once and then held in the container, each keeping the connection it
+ * was built with, so one tenant ends up reading another's rows.
+ *
+ * Forgetting the resolved instances makes the next call rebuild them against
+ * the current connection. This is also why `CacheTenancyBootstrapper` is not
+ * used: it isolates by tagging, and this application's default `database`
+ * store cannot tag at all.
+ */
+final readonly class CacheStoreBootstrapper implements TenancyBootstrapper
+{
+    public function __construct(private Application $app)
+    {
+        //
+    }
+
+    public function bootstrap(Tenant $tenant): void
+    {
+        $this->forgetResolved();
+    }
+
+    public function revert(): void
+    {
+        $this->forgetResolved();
+    }
+
+    private function forgetResolved(): void
+    {
+        $default = $this->app->make(\Illuminate\Contracts\Config\Repository::class)->get('cache.default');
+
+        if (is_string($default)) {
+            $this->app->make(\Illuminate\Contracts\Cache\Factory::class)->forgetDriver($default);
+        }
+
+        $this->app->forgetInstance('cache.store');
+        $this->app->forgetInstance('session');
+        $this->app->forgetInstance('session.store');
+    }
+}

@@ -43,6 +43,7 @@ beforeEach(function (): void {
         'tests/Unit/Models/UserTest.php',
         'resources/js/types/index.d.ts',
         'tests/Pest.php',
+        'database/seeders/DatabaseSeeder.php',
         'resources/js/components/app-sidebar.tsx',
         'routes/web.php',
         'resources/views/home.blade.php',
@@ -121,8 +122,11 @@ it('moves the kit migrations into the tenant directory', function (): void {
     $central = collect($this->files->files($this->scratch.'/database/migrations'))
         ->map(fn ($file): string => $file->getFilename());
 
+    // Queue tables stay central so one worker can serve every tenant.
     expect($this->scratch.'/database/migrations/tenant/0001_01_01_000000_create_users_table.php')->toBeReadableFile()
-        ->and($central)->each->toMatch('/tenants_table|domains_table|impersonation_tokens_table/');
+        ->and($this->scratch.'/database/migrations/tenant/0001_01_01_000001_create_cache_table.php')->toBeReadableFile()
+        ->and($this->scratch.'/database/migrations/0001_01_01_000002_create_jobs_table.php')->toBeReadableFile()
+        ->and($central)->each->toMatch('/tenants_table|domains_table|impersonation_tokens_table|jobs_table/');
 });
 
 it('registers the tenancy service provider', function (): void {
@@ -188,7 +192,14 @@ it('runs the generated tests inside a tenant', function (): void {
         ->toContain('use App\Models\Tenant;')
         ->toContain('tenancy()->initialize($tenant);')
         ->toContain("URL::forceRootUrl('http://test.localhost');")
-        ->toContain('tenancy()->end();');
+        ->toContain('tenancy()->end();')
+        ->and($this->files->get($this->scratch.'/database/seeders/DatabaseSeeder.php'))
+        ->toContain('if (! tenancy()->initialized) {')
+        ->and($this->scratch.'/app/Console/Commands/CreateTenant.php')->toBeReadableFile()
+        ->and($this->scratch.'/app/Tenancy/CacheStoreBootstrapper.php')->toBeReadableFile()
+        ->and($this->files->get($this->scratch.'/config/tenancy.php'))
+        ->toContain('App\Tenancy\CacheStoreBootstrapper::class,')
+        ->not->toContain("\n        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,");
 });
 
 it('hands the kit routes over to the tenant context', function (): void {
@@ -197,10 +208,11 @@ it('hands the kit routes over to the tenant context', function (): void {
 
     $bootstrap = $this->files->get($this->scratch.'/bootstrap/app.php');
 
-    // The central domains keep serving only central.php; web.php and admin.php
+    // The central domains keep serving only central.php, and statelessly —
+    // the sessions table lives in the tenant databases. web.php and admin.php
     // are required from inside the tenant group instead of being rewritten.
     expect($bootstrap)
-        ->toContain("web: __DIR__.'/../routes/central.php'")
+        ->toContain("Route::group([], base_path('routes/central.php'));")
         ->not->toContain('routes/web.php')
         ->not->toContain('routes/admin.php')
         ->and($this->files->get($this->scratch.'/routes/tenant.php'))

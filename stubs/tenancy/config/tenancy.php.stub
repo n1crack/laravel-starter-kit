@@ -29,9 +29,22 @@ return [
      */
     'bootstrappers' => [
         Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class,
-        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
+        App\Tenancy\CacheStoreBootstrapper::class,
+
+    /**
+     * CacheTenancyBootstrapper is deliberately replaced by the one above.
+     * It isolates the cache by tagging every call, and this application's
+     * default store is `database`, which cannot tag — every `Cache::put()`
+     * inside a tenant would throw. The `cache` table lives in the tenant
+     * database instead, so the connection already separates tenants once
+     * the resolved store is rebuilt.
+     *
+     * Moving to a shared store such as Redis changes that: put this back,
+     * or RedisTenancyBootstrapper, and drop the one above.
+     */
+        // Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
         // Stancl\Tenancy\Bootstrappers\RedisTenancyBootstrapper::class, // Note: phpredis is needed
     ],
 

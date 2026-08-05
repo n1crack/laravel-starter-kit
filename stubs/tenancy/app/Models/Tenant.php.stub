@@ -6,9 +6,11 @@ namespace App\Models;
 
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Stancl\Tenancy\Database\Models\Domain;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 /**
@@ -21,4 +23,15 @@ final class Tenant extends BaseTenant implements TenantWithDatabase
      * @use HasFactory<TenantFactory>
      */
     use HasDatabase, HasDomains, HasFactory;
+
+    /**
+     * The package's own `domains()` is untyped, which leaves every call on it
+     * as `mixed` under static analysis.
+     *
+     * @return HasMany<Domain, $this>
+     */
+    public function domains(): HasMany
+    {
+        return $this->hasMany(Domain::class, 'tenant_id');
+    }
 }

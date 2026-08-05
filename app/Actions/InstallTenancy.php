@@ -59,6 +59,20 @@ final readonly class InstallTenancy
             ],
         ],
 
+        // Everything this seeder creates — roles, users — now lives in a tenant
+        // database, so running it centrally would fail on missing tables. It
+        // stays the tenant seeder, which is what `Jobs\SeedDatabase` runs when
+        // a tenant is created; centrally it says where to go instead.
+        'database/seeders/DatabaseSeeder.php' => [
+            [
+                "    public function run(): void\n    {\n",
+                "    public function run(): void\n    {\n"
+                    ."        if (! tenancy()->initialized) {\n"
+                    ."            \$this->command->warn('Nothing is seeded centrally. Run tenants:create or tenants:seed instead.');\n\n"
+                    ."            return;\n        }\n\n",
+            ],
+        ],
+
         'bootstrap/providers.php' => [
             [
                 '    App\\Providers\\FortifyServiceProvider::class,',
@@ -72,10 +86,6 @@ final readonly class InstallTenancy
         // middleware group, which is why neither is rewritten here.
         'bootstrap/app.php' => [
             [
-                "use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;\nuse Illuminate\\Support\\Facades\\Route;",
-                'use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;',
-            ],
-            [
                 "        web: __DIR__.'/../routes/web.php',\n"
                     ."        commands: __DIR__.'/../routes/console.php',\n"
                     ."        then: function (): void {\n"
@@ -84,10 +94,31 @@ final readonly class InstallTenancy
                     ."                ->name('admin.')\n"
                     ."                ->group(base_path('routes/admin.php'));\n"
                     ."        },\n",
-                "        web: __DIR__.'/../routes/central.php',\n"
-                    ."        commands: __DIR__.'/../routes/console.php',\n",
+                "        commands: __DIR__.'/../routes/console.php',\n"
+                    ."        then: function (): void {\n"
+                    ."            // Central routes are stateless: the sessions table lives in the\n"
+                    ."            // tenant databases, so the central domains must not start one.\n"
+                    ."            Route::group([], base_path('routes/central.php'));\n"
+                    ."        },\n",
             ],
         ],
+    ];
+
+    /**
+     * Migrations that describe something the whole installation shares, rather
+     * than something one tenant owns.
+     *
+     * Queue tables stay central so a single `queue:work` serves every tenant —
+     * `QueueTenancyBootstrapper` puts each job back in its tenant's context
+     * when it runs. Per-tenant queue tables would need a worker per tenant.
+     *
+     * @var list<string>
+     */
+    private const array CENTRAL_MIGRATIONS = [
+        'create_tenants_table',
+        'create_domains_table',
+        'impersonation_tokens_table',
+        'create_jobs_table',
     ];
 
     public function __construct(
@@ -118,8 +149,8 @@ final readonly class InstallTenancy
     }
 
     /**
-     * Every migration the kit ships describes tenant-owned data, so all of them
-     * move. The tenants and domains migrations the stubs publish stay central.
+     * Everything else the kit ships describes tenant-owned data — users,
+     * sessions, cache, permissions — so it moves into the tenant database.
      */
     private function moveMigrationsToTenant(string $basePath): void
     {
@@ -129,15 +160,15 @@ final readonly class InstallTenancy
         $this->files->ensureDirectoryExists($tenant);
 
         foreach ($this->files->files($central) as $migration) {
-            if (str_contains($migration->getFilename(), 'create_tenants_table')) {
+            $stays = array_filter(
+                self::CENTRAL_MIGRATIONS,
+                fn (string $name): bool => str_contains($migration->getFilename(), $name),
+            );
+
+            if ($stays !== []) {
                 continue;
             }
-            if (str_contains($migration->getFilename(), 'create_domains_table')) {
-                continue;
-            }
-            if (str_contains($migration->getFilename(), 'impersonation_tokens_table')) {
-                continue;
-            }
+
             $this->files->move(
                 $migration->getPathname(),
                 $tenant.DIRECTORY_SEPARATOR.$migration->getFilename(),
