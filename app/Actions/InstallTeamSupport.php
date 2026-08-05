@@ -70,9 +70,7 @@ final readonly class InstallTeamSupport
      */
     private function publishStubs(string $basePath, string $stubPath): void
     {
-        if (! $this->files->isDirectory($stubPath)) {
-            throw new RuntimeException("Team stubs are missing from [{$stubPath}].");
-        }
+        throw_unless($this->files->isDirectory($stubPath), RuntimeException::class, "Team stubs are missing from [{$stubPath}].");
 
         foreach ($this->files->allFiles($stubPath) as $file) {
             $relative = mb_substr($file->getPathname(), mb_strlen($stubPath) + 1);
@@ -88,7 +86,7 @@ final readonly class InstallTeamSupport
         $relative = (string) preg_replace('/\.stub$/', '', $relative);
 
         if (str_starts_with($relative, 'database/migrations/')) {
-            $relative = str_replace(
+            return str_replace(
                 'database/migrations/',
                 'database/migrations/'.now()->format('Y_m_d_His').'_',
                 $relative,
@@ -103,9 +101,7 @@ final readonly class InstallTeamSupport
         foreach (self::PATCHES as $file => $edits) {
             $path = $basePath.DIRECTORY_SEPARATOR.$file;
 
-            if (! $this->files->exists($path)) {
-                throw new RuntimeException("Cannot add team support: [{$file}] is missing.");
-            }
+            throw_unless($this->files->exists($path), RuntimeException::class, "Cannot add team support: [{$file}] is missing.");
 
             $contents = $this->files->get($path);
 
@@ -114,11 +110,7 @@ final readonly class InstallTeamSupport
                     continue;
                 }
 
-                if (mb_substr_count($contents, $search) !== 1) {
-                    throw new RuntimeException(
-                        "Cannot add team support: [{$file}] does not match what the stubs expect.",
-                    );
-                }
+                throw_if(mb_substr_count($contents, $search) !== 1, RuntimeException::class, "Cannot add team support: [{$file}] does not match what the stubs expect.");
 
                 $contents = str_replace($search, $replace, $contents);
             }

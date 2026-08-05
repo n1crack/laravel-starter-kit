@@ -32,7 +32,7 @@ afterEach(function (): void {
 
 function configureDatabase(DatabaseDriver $driver, string $basePath, string $name = 'acme'): void
 {
-    (new ConfigureDatabaseConnection(new Filesystem))->handle($driver, $basePath, $name);
+    new ConfigureDatabaseConnection(new Filesystem)->handle($driver, $basePath, $name);
 }
 
 it('uncomments the connection settings for a server driver', function (): void {

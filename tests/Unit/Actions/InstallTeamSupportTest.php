@@ -23,7 +23,7 @@ afterEach(function (): void {
 
 function installTeams(string $basePath, ?string $stubPath = null): void
 {
-    (new InstallTeamSupport(new Filesystem))->handle($basePath, $stubPath ?? base_path('stubs/teams'));
+    new InstallTeamSupport(new Filesystem)->handle($basePath, $stubPath ?? base_path('stubs/teams'));
 }
 
 it('publishes every stub without the stub suffix', function (): void {

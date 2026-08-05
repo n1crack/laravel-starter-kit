@@ -12,14 +12,12 @@ use Illuminate\Console\Command;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 
+#[\Illuminate\Console\Attributes\Description('Configure a freshly installed copy of the starter kit')]
+#[\Illuminate\Console\Attributes\Signature('starter-kit:install
+        {--teams : Add team support without prompting}
+        {--database= : The database driver to use, skipping the prompt}')]
 final class InstallStarterKit extends Command
 {
-    protected $signature = 'starter-kit:install
-        {--teams : Add team support without prompting}
-        {--database= : The database driver to use, skipping the prompt}';
-
-    protected $description = 'Configure a freshly installed copy of the starter kit';
-
     public function handle(ConfigureDatabaseConnection $configureDatabase, InstallTeamSupport $installTeams): int
     {
         $option = $this->option('database');
