@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enums;
+
+enum TeamRole: string
+{
+    case Owner = 'owner';
+    case Admin = 'admin';
+    case Member = 'member';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Owner => 'Owner',
+            self::Admin => 'Administrator',
+            self::Member => 'Member',
+        };
+    }
+
+    /**
+     * Whether the role may invite, remove, or re-role other members.
+     */
+    public function managesMembers(): bool
+    {
+        return $this === self::Owner || $this === self::Admin;
+    }
+
+    /**
+     * Roles that may be handed out to a member, so ownership cannot be granted
+     * by way of an invitation or a role change.
+     *
+     * @return list<self>
+     */
+    public static function assignable(): array
+    {
+        return [self::Admin, self::Member];
+    }
+}

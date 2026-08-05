@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Concerns;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * @phpstan-require-extends \Illuminate\Foundation\Auth\User
+ */
+trait HasTeams
+{
+    /**
+     * @return HasMany<Team, $this>
+     */
+    public function ownedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class, 'owner_id');
+    }
+
+    /**
+     * @return BelongsToMany<Team, $this>
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class)
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    /**
+     * @return BelongsTo<Team, $this>
+     */
+    public function currentTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'current_team_id');
+    }
+
+    public function belongsToTeam(Team $team): bool
+    {
+        return $this->teams()->whereKey($team->id)->exists();
+    }
+
+    public function teamRole(Team $team): ?TeamRole
+    {
+        return $team->roleFor($this);
+    }
+
+    public function ownsTeam(Team $team): bool
+    {
+        return $team->owner_id === $this->getKey();
+    }
+}
