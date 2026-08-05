@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\ConfigureDatabaseConnection;
+use App\Actions\InstallReactPublicPages;
 use App\Actions\InstallTeamSupport;
 use App\Actions\InstallTenancy;
 use App\Enums\DatabaseDriver;
@@ -29,6 +30,7 @@ final class InstallStarterKit extends Command
 {
     public function handle(
         ConfigureDatabaseConnection $configureDatabase,
+        InstallReactPublicPages $installReactPublicPages,
         InstallTeamSupport $installTeams,
         InstallTenancy $installTenancy,
     ): int {
@@ -46,6 +48,10 @@ final class InstallStarterKit extends Command
             $this->components->error('Invalid public stack ['.$this->option('public').'].');
 
             return self::FAILURE;
+        }
+
+        if ($public === PublicStack::React) {
+            $installReactPublicPages->handle(base_path(), base_path('stubs/public-react'));
         }
 
         $this->components->info('Public pages: '.$public->label().'.');

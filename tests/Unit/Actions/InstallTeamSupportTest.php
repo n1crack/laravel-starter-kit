@@ -90,3 +90,15 @@ it('fails when a patched file has drifted from the stubs', function (): void {
 
     installTeams($this->basePath);
 })->throws(RuntimeException::class, 'does not match what the stubs expect');
+
+it('re-applies nothing when a deleting patch already ran', function (): void {
+    $file = $this->basePath.'/config/permission.php';
+    $this->files->put($file, "<?php\n\nreturn ['teams' => false];\n");
+
+    $patch = ['config/permission.php' => [["'teams' => false", '']]];
+
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+    resolve(App\Actions\PatchFiles::class)->handle($this->basePath, $patch);
+
+    expect($this->files->get($file))->toBe("<?php\n\nreturn [];\n");
+});

@@ -39,6 +39,12 @@ beforeEach(function (): void {
         'bootstrap/providers.php',
         'bootstrap/app.php',
         'composer.json',
+        'routes/web.php',
+        'resources/views/home.blade.php',
+        'resources/views/components/layouts/public.blade.php',
+        'app/Livewire/ContactForm.php',
+        'resources/views/livewire/contact-form.blade.php',
+        'tests/Feature/Livewire/ContactFormTest.php',
     ];
 
     foreach ($patched as $file) {
@@ -120,6 +126,39 @@ it('registers the tenancy service provider', function (): void {
 
     expect($this->files->get($this->scratch.'/bootstrap/providers.php'))
         ->toContain('App\Providers\TenancyServiceProvider::class,');
+});
+
+it('swaps the public pages over to react', function (): void {
+    $this->artisan('starter-kit:install', ['--public' => 'react', '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->scratch.'/resources/js/pages/home.tsx')->toBeReadableFile()
+        ->and($this->scratch.'/resources/js/layouts/public-layout.tsx')->toBeReadableFile()
+        ->and($this->scratch.'/app/Http/Controllers/ContactController.php')->toBeReadableFile()
+        ->and($this->files->get($this->scratch.'/routes/web.php'))
+        ->toContain("Inertia::render('home')")
+        ->toContain("'contact.store'")
+        ->and($this->files->get($this->scratch.'/composer.json'))->not->toContain('livewire/livewire');
+});
+
+it('removes the blade and livewire public pages it replaces', function (): void {
+    $this->artisan('starter-kit:install', ['--public' => 'react', '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->files->exists($this->scratch.'/resources/views/home.blade.php'))->toBeFalse()
+        ->and($this->files->exists($this->scratch.'/app/Livewire'))->toBeFalse()
+        ->and($this->files->exists($this->scratch.'/resources/views/livewire'))->toBeFalse()
+        ->and($this->files->exists($this->scratch.'/tests/Feature/Livewire'))->toBeFalse();
+});
+
+it('leaves the blade public pages alone for the livewire stack', function (): void {
+    $this->artisan('starter-kit:install', ['--public' => 'livewire', '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->scratch.'/resources/views/home.blade.php')->toBeReadableFile()
+        ->and($this->scratch.'/app/Livewire/ContactForm.php')->toBeReadableFile()
+        ->and($this->files->exists($this->scratch.'/resources/js/pages/home.tsx'))->toBeFalse()
+        ->and($this->files->get($this->scratch.'/composer.json'))->toContain('livewire/livewire');
 });
 
 it('requires the tenancy package and says composer still has to run', function (): void {

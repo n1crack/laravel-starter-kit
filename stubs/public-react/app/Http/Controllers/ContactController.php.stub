@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\CreateContactMessageRequest;
+use Illuminate\Http\RedirectResponse;
+
+final readonly class ContactController
+{
+    public function store(CreateContactMessageRequest $request): RedirectResponse
+    {
+        // Deliver the message however your application needs (mail, database, ...).
+        $request->validated();
+
+        return back()->with('status', 'contact-message-sent');
+    }
+}

@@ -38,7 +38,16 @@ final readonly class PatchFiles
             $contents = $this->files->get($path);
 
             foreach ($edits as [$search, $replace]) {
-                if (str_contains($contents, $replace)) {
+                // A replacement normally contains its own search string, so its
+                // presence means the edit already ran. An edit that deletes has
+                // no replacement to look for, so the search going missing is
+                // what marks it done — `str_contains` against an empty needle
+                // is always true and would skip the edit forever.
+                $applied = $replace === ''
+                    ? ! str_contains($contents, $search)
+                    : str_contains($contents, $replace);
+
+                if ($applied) {
                     continue;
                 }
 

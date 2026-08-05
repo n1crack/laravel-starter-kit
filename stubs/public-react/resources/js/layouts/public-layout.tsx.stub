@@ -1,0 +1,44 @@
+import AppLogoIcon from '@/components/app-logo-icon';
+import { login, register } from '@/routes';
+import { Link } from '@inertiajs/react';
+import { type PropsWithChildren } from 'react';
+
+/**
+ * The public shell. Deliberately unlike the user and admin layouts: no
+ * sidebar, no breadcrumbs, just a marketing header and footer around a
+ * full-width page.
+ */
+export default function PublicLayout({ children }: PropsWithChildren) {
+    return (
+        <div className="flex min-h-screen flex-col">
+            <header className="border-border/60 border-b">
+                <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+                    <Link href="/" className="flex items-center gap-2">
+                        <AppLogoIcon className="size-7" />
+                    </Link>
+
+                    <div className="flex items-center gap-2 text-sm">
+                        <Link
+                            href={login()}
+                            className="rounded-md px-4 py-2 font-medium"
+                        >
+                            Log in
+                        </Link>
+                        <Link
+                            href={register()}
+                            className="bg-foreground text-background rounded-md px-4 py-2 font-medium hover:opacity-90"
+                        >
+                            Get started
+                        </Link>
+                    </div>
+                </nav>
+            </header>
+
+            <main className="flex-1">{children}</main>
+
+            <footer className="border-border/60 text-muted-foreground border-t px-6 py-8 text-center text-sm">
+                &copy; {new Date().getFullYear()}
+            </footer>
+        </div>
+    );
+}
