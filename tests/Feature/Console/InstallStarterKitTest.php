@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\DatabaseDriver;
+use App\Enums\PublicStack;
 use Illuminate\Filesystem\Filesystem;
 
 /**
@@ -31,11 +32,19 @@ beforeEach(function (): void {
     $this->files->put($this->scratch.'/.env', $environment);
     $this->files->put($this->scratch.'/.env.example', $environment);
 
-    foreach (['app/Models/User.php', 'config/permission.php', 'app/Http/Middleware/HandleInertiaRequests.php'] as $file) {
+    $patched = [
+        'app/Models/User.php',
+        'config/permission.php',
+        'app/Http/Middleware/HandleInertiaRequests.php',
+        'bootstrap/providers.php',
+    ];
+
+    foreach ($patched as $file) {
         $this->files->ensureDirectoryExists($this->scratch.'/'.dirname($file));
         $this->files->copy($this->originalBasePath.'/'.$file, $this->scratch.'/'.$file);
     }
 
+    $this->files->copyDirectory($this->originalBasePath.'/database/migrations', $this->scratch.'/database/migrations');
     $this->files->copyDirectory($this->originalBasePath.'/stubs', $this->scratch.'/stubs');
 
     $this->app->setBasePath($this->scratch);
@@ -46,38 +55,91 @@ afterEach(function (): void {
     $this->files->deleteDirectory($this->scratch);
 });
 
-it('asks for teams support and a database driver', function (): void {
+it('asks for the public stack, teams, tenancy and a database driver', function (): void {
     $this->artisan('starter-kit:install')
+        ->expectsQuestion('How should the public pages be rendered?', PublicStack::React->value)
         ->expectsQuestion('Would you like to add teams support to your application?', true)
+        ->expectsQuestion('Would you like to add multi-tenancy to your application?', true)
+        ->expectsQuestion('Which domains serve the application itself?', 'app.test, localhost')
+        ->expectsQuestion('What should tenant database names be prefixed with?', 'acme')
         ->expectsQuestion('Which database will your application use?', DatabaseDriver::Pgsql->value)
         ->assertSuccessful();
 
     expect($this->scratch.'/app/Models/Team.php')->toBeReadableFile()
+        ->and($this->scratch.'/config/tenancy.php')->toBeReadableFile()
         ->and($this->files->get($this->scratch.'/.env'))->toContain('DB_CONNECTION=pgsql');
 });
 
-it('leaves teams out when declined', function (): void {
+it('does not ask the tenancy follow ups when tenancy is declined', function (): void {
     $this->artisan('starter-kit:install')
+        ->expectsQuestion('How should the public pages be rendered?', PublicStack::Livewire->value)
         ->expectsQuestion('Would you like to add teams support to your application?', false)
+        ->expectsQuestion('Would you like to add multi-tenancy to your application?', false)
         ->expectsQuestion('Which database will your application use?', DatabaseDriver::Sqlite->value)
         ->assertSuccessful();
 
-    expect($this->files->exists($this->scratch.'/app/Models/Team.php'))->toBeFalse()
-        ->and($this->files->get($this->scratch.'/.env'))->toContain('DB_CONNECTION=sqlite');
+    expect($this->files->exists($this->scratch.'/config/tenancy.php'))->toBeFalse()
+        ->and($this->files->exists($this->scratch.'/app/Models/Team.php'))->toBeFalse();
 });
 
-it('skips both prompts when the options are given', function (): void {
-    $this->artisan('starter-kit:install', ['--teams' => true, '--database' => 'mysql'])
+it('writes the central domains and tenant prefix into the config', function (): void {
+    $this->artisan('starter-kit:install', [
+        '--tenancy' => true,
+        '--central-domain' => ['app.test', 'admin.app.test'],
+        '--tenant-prefix' => 'acme',
+        '--public' => PublicStack::Livewire->value,
+        '--database' => 'mysql',
+        '--no-interaction' => true,
+    ])->assertSuccessful();
+
+    $config = $this->files->get($this->scratch.'/config/tenancy.php');
+
+    expect($config)
+        ->toContain("'app.test',")
+        ->toContain("'admin.app.test',")
+        ->toContain("'prefix' => 'acme'")
+        ->not->toContain("'127.0.0.1',");
+});
+
+it('moves the kit migrations into the tenant directory', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])
+        ->assertSuccessful();
+
+    $central = collect($this->files->files($this->scratch.'/database/migrations'))
+        ->map(fn ($file): string => $file->getFilename());
+
+    expect($this->scratch.'/database/migrations/tenant/0001_01_01_000000_create_users_table.php')->toBeReadableFile()
+        ->and($central)->each->toMatch('/tenants_table|domains_table|impersonation_tokens_table/');
+});
+
+it('registers the tenancy service provider', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->files->get($this->scratch.'/bootstrap/providers.php'))
+        ->toContain('App\Providers\TenancyServiceProvider::class,');
+});
+
+it('skips the prompts it was given options for', function (): void {
+    // There is no `--no-tenancy`, matching how the Laravel installer treats its
+    // own boolean flags, so declining tenancy is still a prompt here.
+    $this->artisan('starter-kit:install', [
+        '--public' => PublicStack::React->value,
+        '--teams' => true,
+        '--database' => 'mysql',
+    ])
+        ->expectsQuestion('Would you like to add multi-tenancy to your application?', false)
         ->assertSuccessful();
 
     expect($this->scratch.'/app/Models/Team.php')->toBeReadableFile()
         ->and($this->files->get($this->scratch.'/.env'))->toContain('DB_CONNECTION=mysql');
 });
 
-it('falls back to sqlite without teams when not interactive', function (): void {
+it('falls back to livewire, sqlite and no extras when not interactive', function (): void {
     $this->artisan('starter-kit:install', ['--no-interaction' => true])->assertSuccessful();
 
     expect($this->files->exists($this->scratch.'/app/Models/Team.php'))->toBeFalse()
+        ->and($this->files->exists($this->scratch.'/config/tenancy.php'))->toBeFalse()
         ->and($this->files->get($this->scratch.'/.env'))->toContain('DB_CONNECTION=sqlite');
 });
 
@@ -87,6 +149,12 @@ it('rejects an unknown database driver', function (): void {
         ->assertFailed();
 
     expect($this->files->get($this->scratch.'/.env'))->toContain('DB_CONNECTION=sqlite');
+});
+
+it('rejects an unknown public stack', function (): void {
+    $this->artisan('starter-kit:install', ['--public' => 'vue'])
+        ->expectsOutputToContain('Invalid public stack [vue].')
+        ->assertFailed();
 });
 
 it('names the database after the application', function (): void {

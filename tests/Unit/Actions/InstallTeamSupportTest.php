@@ -23,7 +23,7 @@ afterEach(function (): void {
 
 function installTeams(string $basePath, ?string $stubPath = null): void
 {
-    new InstallTeamSupport(new Filesystem)->handle($basePath, $stubPath ?? base_path('stubs/teams'));
+    resolve(InstallTeamSupport::class)->handle($basePath, $stubPath ?? base_path('stubs/teams'));
 }
 
 it('publishes every stub without the stub suffix', function (): void {
@@ -77,13 +77,13 @@ it('can be run twice without duplicating the patches', function (): void {
 
 it('fails when the stubs are missing', function (): void {
     installTeams($this->basePath, $this->basePath.'/nowhere');
-})->throws(RuntimeException::class, 'Team stubs are missing');
+})->throws(RuntimeException::class, 'Stubs are missing from');
 
 it('fails when a patched file is missing', function (): void {
     $this->files->delete($this->basePath.'/config/permission.php');
 
     installTeams($this->basePath);
-})->throws(RuntimeException::class, '[config/permission.php] is missing');
+})->throws(RuntimeException::class, 'Cannot patch [config/permission.php]');
 
 it('fails when a patched file has drifted from the stubs', function (): void {
     $this->files->put($this->basePath.'/config/permission.php', '<?php return [];');
