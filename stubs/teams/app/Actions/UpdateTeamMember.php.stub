@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+
+final readonly class UpdateTeamMember
+{
+    /**
+     * Change a member's role within a team.
+     *
+     * The owner's role is not changeable: ownership is a property of the team,
+     * not something a role edit should be able to take away.
+     *
+     * @return bool whether the role was changed
+     */
+    public function handle(Team $team, User $member, TeamRole $role): bool
+    {
+        if ($team->owner_id === $member->id || ! $team->hasMember($member)) {
+            return false;
+        }
+
+        $team->members()->updateExistingPivot($member->id, ['role' => $role->value]);
+
+        return true;
+    }
+}

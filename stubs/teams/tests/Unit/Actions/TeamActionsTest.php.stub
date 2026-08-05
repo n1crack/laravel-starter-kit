@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Actions\CreateTeam;
+use App\Actions\DeleteTeam;
+use App\Actions\SwitchTeam;
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Models\User;
+
+it('makes the first team a user creates their current one', function (): void {
+    $user = User::factory()->create();
+
+    $first = app(CreateTeam::class)->handle($user, ['name' => 'First']);
+    $second = app(CreateTeam::class)->handle($user, ['name' => 'Second']);
+
+    expect($user->refresh()->current_team_id)->toBe($first->id)
+        ->and($second->roleFor($user))->toBe(TeamRole::Owner);
+});
+
+it('clears the current team of everyone in a deleted team', function (): void {
+    $owner = User::factory()->create();
+    $member = User::factory()->create();
+
+    $team = app(CreateTeam::class)->handle($owner, ['name' => 'Doomed']);
+    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+    $member->forceFill(['current_team_id' => $team->id])->save();
+
+    TeamInvitation::factory()->create(['team_id' => $team->id]);
+
+    app(DeleteTeam::class)->handle($team);
+
+    expect($owner->refresh()->current_team_id)->toBeNull()
+        ->and($member->refresh()->current_team_id)->toBeNull()
+        ->and(TeamInvitation::query()->where('team_id', $team->id)->exists())->toBeFalse()
+        ->and(Team::query()->whereKey($team->id)->exists())->toBeFalse();
+});
+
+it('only switches to a team the user belongs to', function (): void {
+    $user = User::factory()->create();
+    $stranger = Team::factory()->create();
+
+    expect(app(SwitchTeam::class)->handle($user, $stranger))->toBeFalse()
+        ->and($user->refresh()->current_team_id)->toBeNull();
+});

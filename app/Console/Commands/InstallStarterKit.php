@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\ConfigureDatabaseConnection;
+use App\Actions\DeleteFiles;
 use App\Actions\InstallReactPublicPages;
 use App\Actions\InstallTeamSupport;
 use App\Actions\InstallTenancy;
@@ -30,6 +31,7 @@ final class InstallStarterKit extends Command
 {
     public function handle(
         ConfigureDatabaseConnection $configureDatabase,
+        DeleteFiles $deleteFiles,
         InstallReactPublicPages $installReactPublicPages,
         InstallTeamSupport $installTeams,
         InstallTenancy $installTenancy,
@@ -79,6 +81,15 @@ final class InstallStarterKit extends Command
         $configureDatabase->handle($driver, base_path(), $this->databaseName());
 
         $this->components->info('Using '.$driver->label().'.');
+
+        // These cover the kit's own installer, not the application it just
+        // produced. They copy pristine kit files into a scratch directory to
+        // detect stub drift, which cannot hold once the files are patched.
+        $deleteFiles->handle(base_path(), [
+            'tests/Feature/Console',
+            'tests/Unit/Actions/ConfigureDatabaseConnectionTest.php',
+            'tests/Unit/Actions/InstallTeamSupportTest.php',
+        ]);
 
         return self::SUCCESS;
     }

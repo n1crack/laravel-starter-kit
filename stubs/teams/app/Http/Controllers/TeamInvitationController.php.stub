@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Actions\AcceptTeamInvitation;
+use App\Actions\CreateTeamInvitation;
+use App\Actions\DeleteTeamInvitation;
+use App\Enums\TeamRole;
+use App\Http\Requests\CreateTeamInvitationRequest;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Models\User;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+final readonly class TeamInvitationController
+{
+    public function store(
+        CreateTeamInvitationRequest $request,
+        Team $team,
+        CreateTeamInvitation $action,
+    ): RedirectResponse {
+        Gate::authorize('manageMembers', $team);
+
+        $action->handle(
+            $team,
+            $request->string('email')->value(),
+            TeamRole::from($request->string('role')->value()),
+        );
+
+        return to_route('teams.edit', $team);
+    }
+
+    /**
+     * Accept an invitation. The link is signed, so the address it was sent to
+     * is still checked against the signed-in user before joining them.
+     */
+    public function update(
+        TeamInvitation $invitation,
+        #[CurrentUser] User $user,
+        AcceptTeamInvitation $action,
+    ): RedirectResponse {
+        if (! $action->handle($invitation, $user)) {
+            throw new HttpException(403, 'This invitation was sent to a different address.');
+        }
+
+        return to_route('teams.index');
+    }
+
+    public function destroy(
+        Team $team,
+        TeamInvitation $invitation,
+        DeleteTeamInvitation $action,
+    ): RedirectResponse {
+        Gate::authorize('manageMembers', $team);
+
+        $action->handle($invitation);
+
+        return to_route('teams.edit', $team);
+    }
+}

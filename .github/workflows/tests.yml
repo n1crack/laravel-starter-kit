@@ -90,3 +90,66 @@ jobs:
           name: browser-screenshots
           path: |
             tests/Browser/Screenshots
+
+  # The stub trees under `stubs/` are never executed by the kit's own suite —
+  # only their publishing and patching is. This installs each optional feature
+  # into a scratch checkout and runs the resulting application's tests, so the
+  # generated code cannot rot unnoticed.
+  install:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            options: --no-interaction
+          - name: teams
+            options: --teams --no-interaction
+          - name: react-public
+            options: --public=react --no-interaction
+          - name: react-public-and-teams
+            options: --public=react --teams --no-interaction
+
+    name: install (${{ matrix.name }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          tools: composer:v2
+          ini-values: zend.assertions=1
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Install the starter kit
+        run: php artisan starter-kit:install ${{ matrix.options }}
+
+      # The React public pages drop Livewire, and team support adds classes the
+      # autoloader has not seen yet.
+      - name: Refresh Dependencies
+        run: |
+          composer update --no-interaction --prefer-dist
+          npm install
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Test the generated application
+        run: php artisan test --testsuite=Feature,Unit

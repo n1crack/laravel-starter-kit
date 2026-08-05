@@ -41,7 +41,10 @@ return new class extends Migration
         });
 
         Schema::table('users', function (Blueprint $table): void {
-            $table->foreignId('current_team_id')->nullable()->after('email_verified_at');
+            // No `after()`: SQLite ignores it, so the column would land in a
+            // different position per driver and make column-order assertions
+            // depend on the database.
+            $table->foreignId('current_team_id')->nullable();
         });
     }
 

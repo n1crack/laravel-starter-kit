@@ -1,0 +1,97 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+use Inertia\Testing\AssertableInertia;
+
+beforeEach(function (): void {
+    $this->user = User::factory()->create();
+    $this->team = Team::factory()->create(['owner_id' => $this->user->id]);
+    $this->team->members()->attach($this->user, ['role' => TeamRole::Owner->value]);
+});
+
+it('lists the teams a user belongs to', function (): void {
+    Team::factory()->create();
+
+    $response = $this->actingAs($this->user)->get(route('teams.index'));
+
+    $response->assertOk()->assertInertia(
+        fn (AssertableInertia $page): AssertableInertia => $page
+            ->component('teams/index')
+            ->has('teams', 1)
+            ->where('teams.0.id', $this->team->id),
+    );
+});
+
+it('creates a team and makes the creator its owner', function (): void {
+    $response = $this->actingAs($this->user)->post(route('teams.store'), [
+        'name' => 'Engineering',
+    ]);
+
+    $response->assertRedirect(route('teams.index'));
+
+    $team = Team::query()->where('name', 'Engineering')->sole();
+
+    expect($team->owner_id)->toBe($this->user->id)
+        ->and($team->roleFor($this->user))->toBe(TeamRole::Owner);
+});
+
+it('requires a name to create a team', function (): void {
+    $response = $this->actingAs($this->user)->post(route('teams.store'), ['name' => '']);
+
+    $response->assertSessionHasErrors('name');
+});
+
+it('shows the team settings page to a member', function (): void {
+    $response = $this->actingAs($this->user)->get(route('teams.edit', $this->team));
+
+    $response->assertOk()->assertInertia(
+        fn (AssertableInertia $page): AssertableInertia => $page
+            ->component('teams/edit')
+            ->where('team.id', $this->team->id)
+            ->has('members', 1)
+            ->has('invitations', 0),
+    );
+});
+
+it('hides a team from someone who does not belong to it', function (): void {
+    $stranger = User::factory()->create();
+
+    $this->actingAs($stranger)->get(route('teams.edit', $this->team))->assertForbidden();
+});
+
+it('renames a team', function (): void {
+    $response = $this->actingAs($this->user)
+        ->patch(route('teams.update', $this->team), ['name' => 'Platform']);
+
+    $response->assertRedirect(route('teams.edit', $this->team));
+
+    expect($this->team->refresh()->name)->toBe('Platform');
+});
+
+it('does not let a plain member rename a team', function (): void {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($member)
+        ->patch(route('teams.update', $this->team), ['name' => 'Platform'])
+        ->assertForbidden();
+});
+
+it('deletes a team as its owner', function (): void {
+    $response = $this->actingAs($this->user)->delete(route('teams.destroy', $this->team));
+
+    $response->assertRedirect(route('teams.index'));
+
+    expect(Team::query()->whereKey($this->team->id)->exists())->toBeFalse();
+});
+
+it('does not let an administrator delete the team', function (): void {
+    $admin = User::factory()->create();
+    $this->team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($admin)->delete(route('teams.destroy', $this->team))->assertForbidden();
+});

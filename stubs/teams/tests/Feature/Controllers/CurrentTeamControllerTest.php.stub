@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+
+it('switches the current team', function (): void {
+    $user = User::factory()->create();
+
+    $team = Team::factory()->create(['owner_id' => $user->id]);
+    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
+
+    $this->actingAs($user)
+        ->from(route('teams.index'))
+        ->put(route('current-team.update', $team))
+        ->assertRedirect(route('teams.index'));
+
+    expect($user->refresh()->current_team_id)->toBe($team->id);
+});
+
+it('refuses to switch to a team the user does not belong to', function (): void {
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $this->actingAs($user)->put(route('current-team.update', $team))->assertForbidden();
+
+    expect($user->refresh()->current_team_id)->toBeNull();
+});

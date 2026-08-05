@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+
+final readonly class DeleteTeam
+{
+    /**
+     * Delete a team, moving anyone who was currently in it somewhere sensible.
+     *
+     * Members whose current team was this one are left without a current team
+     * rather than being silently dropped into another member's team.
+     */
+    public function handle(Team $team): void
+    {
+        DB::transaction(function () use ($team): void {
+            User::query()
+                ->where('current_team_id', $team->id)
+                ->update(['current_team_id' => null]);
+
+            $team->invitations()->delete();
+            $team->members()->detach();
+            $team->delete();
+        });
+    }
+}

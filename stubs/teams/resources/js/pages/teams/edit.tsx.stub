@@ -1,0 +1,200 @@
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
+import { destroy as destroyTeam, update as updateTeam } from '@/routes/teams';
+import {
+    destroy as destroyInvitation,
+    store as storeInvitation,
+} from '@/routes/team-invitations';
+import { destroy as destroyMember } from '@/routes/team-members';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import { type FormEvent } from 'react';
+
+interface Team {
+    id: number;
+    name: string;
+    owner_id: number;
+}
+
+interface Member {
+    id: number;
+    name: string;
+    email: string;
+}
+
+interface Invitation {
+    id: number;
+    email: string;
+    role: string;
+}
+
+interface Props {
+    team: Team;
+    members: Member[];
+    invitations: Invitation[];
+}
+
+export default function TeamEdit({ team, members, invitations }: Props) {
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Teams', href: '/teams' },
+        { title: team.name, href: `/teams/${team.id}` },
+    ];
+
+    const nameForm = useForm({ name: team.name });
+    const inviteForm = useForm({ email: '', role: 'member' });
+
+    const rename = (event: FormEvent) => {
+        event.preventDefault();
+        nameForm.patch(updateTeam(team.id).url, { preserveScroll: true });
+    };
+
+    const invite = (event: FormEvent) => {
+        event.preventDefault();
+        inviteForm.post(storeInvitation(team.id).url, {
+            preserveScroll: true,
+            onSuccess: () => inviteForm.reset(),
+        });
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={team.name} />
+
+            <div className="flex h-full flex-1 flex-col gap-8 rounded-xl p-4">
+                <section className="space-y-3">
+                    <h2 className="text-lg font-medium">Team name</h2>
+                    <form onSubmit={rename} className="flex items-start gap-2">
+                        <div className="flex-1 sm:max-w-xs">
+                            <Input
+                                value={nameForm.data.name}
+                                onChange={(event) =>
+                                    nameForm.setData('name', event.target.value)
+                                }
+                            />
+                            {nameForm.errors.name && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                    {nameForm.errors.name}
+                                </p>
+                            )}
+                        </div>
+                        <Button type="submit" disabled={nameForm.processing}>
+                            Save
+                        </Button>
+                    </form>
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="text-lg font-medium">Members</h2>
+                    <ul className="divide-border divide-y rounded-md border">
+                        {members.map((member) => (
+                            <li
+                                key={member.id}
+                                className="flex items-center justify-between px-4 py-3"
+                            >
+                                <div>
+                                    <p className="font-medium">{member.name}</p>
+                                    <p className="text-muted-foreground text-sm">
+                                        {member.email}
+                                    </p>
+                                </div>
+
+                                {member.id === team.owner_id ? (
+                                    <Badge>Owner</Badge>
+                                ) : (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            router.delete(
+                                                destroyMember({
+                                                    team: team.id,
+                                                    member: member.id,
+                                                }).url,
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        Remove
+                                    </Button>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="text-lg font-medium">Invite a member</h2>
+                    <form onSubmit={invite} className="flex items-start gap-2">
+                        <div className="flex-1 sm:max-w-xs">
+                            <Input
+                                type="email"
+                                value={inviteForm.data.email}
+                                onChange={(event) =>
+                                    inviteForm.setData(
+                                        'email',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="teammate@example.com"
+                            />
+                            {inviteForm.errors.email && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                    {inviteForm.errors.email}
+                                </p>
+                            )}
+                        </div>
+                        <Button type="submit" disabled={inviteForm.processing}>
+                            Send invitation
+                        </Button>
+                    </form>
+
+                    {invitations.length > 0 && (
+                        <ul className="divide-border divide-y rounded-md border">
+                            {invitations.map((invitation) => (
+                                <li
+                                    key={invitation.id}
+                                    className="flex items-center justify-between px-4 py-3"
+                                >
+                                    <span className="text-sm">
+                                        {invitation.email}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            router.delete(
+                                                destroyInvitation({
+                                                    team: team.id,
+                                                    invitation: invitation.id,
+                                                }).url,
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        Cancel
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+
+                <section className="space-y-3">
+                    <h2 className="text-lg font-medium">Delete team</h2>
+                    <p className="text-muted-foreground text-sm">
+                        Deleting a team removes its members and invitations. This
+                        cannot be undone.
+                    </p>
+                    <Button
+                        variant="destructive"
+                        onClick={() => router.delete(destroyTeam(team.id).url)}
+                    >
+                        Delete team
+                    </Button>
+                </section>
+            </div>
+        </AppLayout>
+    );
+}
