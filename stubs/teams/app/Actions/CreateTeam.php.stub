@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions;
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+
+final readonly class CreateTeam
+{
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function handle(User $owner, array $attributes, bool $personal = false): Team
+    {
+        return DB::transaction(function () use ($owner, $attributes, $personal): Team {
+            $team = Team::query()->create([
+                ...$attributes,
+                'owner_id' => $owner->id,
+                'personal_team' => $personal,
+            ]);
+
+            $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+            if ($owner->currentTeam()->doesntExist()) {
+                $owner->forceFill(['current_team_id' => $team->id])->save();
+            }
+
+            return $team;
+        });
+    }
+}
