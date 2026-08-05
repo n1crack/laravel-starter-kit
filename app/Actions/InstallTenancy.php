@@ -150,11 +150,8 @@ final readonly class InstallTenancy
      */
     private function configure(string $basePath, array $centralDomains, string $databasePrefix): void
     {
+        // Published by `handle()` moments ago, so it is always there.
         $path = $basePath.'/config/tenancy.php';
-
-        if (! $this->files->exists($path)) {
-            return;
-        }
 
         $domains = collect($centralDomains)
             ->map(fn (string $domain): string => "        '".mb_trim($domain)."',")
