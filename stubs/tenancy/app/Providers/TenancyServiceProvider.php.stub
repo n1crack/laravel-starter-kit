@@ -30,6 +30,8 @@ final class TenancyServiceProvider extends ServiceProvider
                 JobPipeline::make([
                     Jobs\CreateDatabase::class,
                     Jobs\MigrateDatabase::class,
+                    // Seeding is opt-in: `tenants:create --seed`. The kit's
+                    // seeder makes demo users, which no real tenant wants.
                     // Jobs\SeedDatabase::class,
 
                     // Your own jobs to prepare the tenant.

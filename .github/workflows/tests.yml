@@ -56,11 +56,11 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-playwright-shell-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright Browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
 
       - name: Install Playwright System Dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
@@ -114,6 +114,7 @@ jobs:
             options: --tenancy --central-domain=localhost --no-interaction
           - name: everything
             options: --tenancy --teams --public=react --central-domain=localhost --no-interaction
+            browser: true
 
     name: install (${{ matrix.name }})
 
@@ -166,7 +167,40 @@ jobs:
           vendor/bin/rector --dry-run
           vendor/bin/phpstan analyse --no-progress
 
+      # Only one combination drives a browser. It is the one that installs
+      # everything, so it covers the most surface, and the other five are
+      # spared a browser download they would only repeat.
+      - name: Get Playwright version
+        if: matrix.browser
+        id: playwright-version
+        run: echo "version=$(npm list playwright --depth=0 --json | jq -er '.dependencies.playwright.version')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright Browsers
+        if: matrix.browser
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-shell-${{ steps.playwright-version.outputs.version }}
+
+      # The headless shell is roughly half the size of full Chromium, and the
+      # suite never runs headed.
+      - name: Install Playwright Browsers
+        if: matrix.browser && steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Install Playwright System Dependencies
+        if: matrix.browser && steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
       - name: Test the generated application
-        run: |
-          vendor/bin/pest --type-coverage --min=100
-          php artisan test --testsuite=Feature,Unit
+        run: vendor/bin/pest --type-coverage --min=100
+
+      # A page answering 200 says nothing about whether its form submits.
+      - name: Test the generated application in a browser
+        if: matrix.browser
+        run: php artisan test
+
+      - name: Test the generated application without a browser
+        if: '!matrix.browser'
+        run: php artisan test --testsuite=Feature,Unit

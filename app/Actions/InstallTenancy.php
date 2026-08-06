@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\DatabaseDriver;
 use Illuminate\Filesystem\Filesystem;
 
 final readonly class InstallTenancy
@@ -47,7 +48,15 @@ final readonly class InstallTenancy
                     ."            Role::findOrCreate(\$role->value);\n        }\n    })",
                 "        \$this->freezeTime();\n\n"
                     ."        \$tenant = Tenant::query()->create();\n"
-                    ."        \$tenant->domains()->create(['domain' => 'test']);\n"
+                    ."        \$tenant->domains()->create(['domain' => 'test']);\n\n"
+                    ."        // Browser tests are served from 127.0.0.1, which is central by\n"
+                    ."        // default and so would refuse every tenant route. The test tenant\n"
+                    ."        // takes that host over; the rest stay central.\n"
+                    ."        \$tenant->domains()->create(['domain' => '127.0.0.1']);\n"
+                    ."        config(['tenancy.central_domains' => array_values(array_diff(\n"
+                    ."            (array) config('tenancy.central_domains'),\n"
+                    ."            ['127.0.0.1'],\n"
+                    ."        ))]);\n\n"
                     ."        tenancy()->initialize(\$tenant);\n\n"
                     ."        URL::forceRootUrl('http://test.localhost');\n\n"
                     ."        foreach (RoleEnum::cases() as \$role) {\n"
@@ -56,6 +65,20 @@ final readonly class InstallTenancy
                     ."        \$tenant = tenant();\n\n"
                     ."        tenancy()->end();\n\n"
                     ."        \$tenant?->delete();\n    })",
+            ],
+        ],
+
+        // Everything this seeder creates — roles, users — now lives in a tenant
+        // database, so running it centrally would fail on missing tables. It
+        // stays the tenant seeder, which is what `Jobs\SeedDatabase` runs when
+        // a tenant is created; centrally it says where to go instead.
+        'database/seeders/DatabaseSeeder.php' => [
+            [
+                "    public function run(): void\n    {\n",
+                "    public function run(): void\n    {\n"
+                    ."        if (! tenancy()->initialized) {\n"
+                    ."            \$this->command->warn('Nothing is seeded centrally. Run tenants:create or tenants:seed instead.');\n\n"
+                    ."            return;\n        }\n\n",
             ],
         ],
 
@@ -72,10 +95,6 @@ final readonly class InstallTenancy
         // middleware group, which is why neither is rewritten here.
         'bootstrap/app.php' => [
             [
-                "use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;\nuse Illuminate\\Support\\Facades\\Route;",
-                'use Illuminate\\Http\\Middleware\\AddLinkHeadersForPreloadedAssets;',
-            ],
-            [
                 "        web: __DIR__.'/../routes/web.php',\n"
                     ."        commands: __DIR__.'/../routes/console.php',\n"
                     ."        then: function (): void {\n"
@@ -84,10 +103,31 @@ final readonly class InstallTenancy
                     ."                ->name('admin.')\n"
                     ."                ->group(base_path('routes/admin.php'));\n"
                     ."        },\n",
-                "        web: __DIR__.'/../routes/central.php',\n"
-                    ."        commands: __DIR__.'/../routes/console.php',\n",
+                "        commands: __DIR__.'/../routes/console.php',\n"
+                    ."        then: function (): void {\n"
+                    ."            // Central routes are stateless: the sessions table lives in the\n"
+                    ."            // tenant databases, so the central domains must not start one.\n"
+                    ."            Route::group([], base_path('routes/central.php'));\n"
+                    ."        },\n",
             ],
         ],
+    ];
+
+    /**
+     * Migrations that describe something the whole installation shares, rather
+     * than something one tenant owns.
+     *
+     * Queue tables stay central so a single `queue:work` serves every tenant —
+     * `QueueTenancyBootstrapper` puts each job back in its tenant's context
+     * when it runs. Per-tenant queue tables would need a worker per tenant.
+     *
+     * @var list<string>
+     */
+    private const array CENTRAL_MIGRATIONS = [
+        'create_tenants_table',
+        'create_domains_table',
+        'impersonation_tokens_table',
+        'create_jobs_table',
     ];
 
     public function __construct(
@@ -108,18 +148,23 @@ final readonly class InstallTenancy
      *
      * @param  list<string>  $centralDomains
      */
-    public function handle(string $basePath, string $stubPath, array $centralDomains, string $databasePrefix): void
-    {
+    public function handle(
+        string $basePath,
+        string $stubPath,
+        array $centralDomains,
+        string $databasePrefix,
+        DatabaseDriver $driver,
+    ): void {
         $this->publishStubs->handle($stubPath, $basePath);
         $this->patchFiles->handle($basePath, self::PATCHES);
 
         $this->moveMigrationsToTenant($basePath);
-        $this->configure($basePath, $centralDomains, $databasePrefix);
+        $this->configure($basePath, $centralDomains, $databasePrefix, $driver);
     }
 
     /**
-     * Every migration the kit ships describes tenant-owned data, so all of them
-     * move. The tenants and domains migrations the stubs publish stay central.
+     * Everything else the kit ships describes tenant-owned data — users,
+     * sessions, cache, permissions — so it moves into the tenant database.
      */
     private function moveMigrationsToTenant(string $basePath): void
     {
@@ -129,15 +174,15 @@ final readonly class InstallTenancy
         $this->files->ensureDirectoryExists($tenant);
 
         foreach ($this->files->files($central) as $migration) {
-            if (str_contains($migration->getFilename(), 'create_tenants_table')) {
+            $stays = array_filter(
+                self::CENTRAL_MIGRATIONS,
+                fn (string $name): bool => str_contains($migration->getFilename(), $name),
+            );
+
+            if ($stays !== []) {
                 continue;
             }
-            if (str_contains($migration->getFilename(), 'create_domains_table')) {
-                continue;
-            }
-            if (str_contains($migration->getFilename(), 'impersonation_tokens_table')) {
-                continue;
-            }
+
             $this->files->move(
                 $migration->getPathname(),
                 $tenant.DIRECTORY_SEPARATOR.$migration->getFilename(),
@@ -148,8 +193,12 @@ final readonly class InstallTenancy
     /**
      * @param  list<string>  $centralDomains
      */
-    private function configure(string $basePath, array $centralDomains, string $databasePrefix): void
-    {
+    private function configure(
+        string $basePath,
+        array $centralDomains,
+        string $databasePrefix,
+        DatabaseDriver $driver,
+    ): void {
         // Published by `handle()` moments ago, so it is always there.
         $path = $basePath.'/config/tenancy.php';
 
@@ -169,6 +218,16 @@ final readonly class InstallTenancy
         $config = (string) preg_replace(
             "/'prefix' => '[^']*'/",
             "'prefix' => '".$databasePrefix."'",
+            $config,
+            1,
+        );
+
+        // A SQLite tenant database is a file named after the database, so
+        // without this it lands in `database/` with no extension and slips
+        // past the `*.sqlite*` ignore rule.
+        $config = (string) preg_replace(
+            "/'suffix' => '[^']*'/",
+            "'suffix' => '".($driver === DatabaseDriver::Sqlite ? '.sqlite' : '')."'",
             $config,
             1,
         );

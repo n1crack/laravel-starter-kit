@@ -35,6 +35,7 @@ export default function TeamsIndex({ teams }: { teams: TeamRow[] }) {
                 <form onSubmit={submit} className="flex items-start gap-2">
                     <div className="flex-1 sm:max-w-xs">
                         <Input
+                            name="name"
                             value={data.name}
                             onChange={(event) =>
                                 setData('name', event.target.value)

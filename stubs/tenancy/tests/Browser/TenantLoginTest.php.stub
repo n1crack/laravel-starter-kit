@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Role as RoleEnum;
+use App\Models\User;
+
+it('signs in through the form and reaches the dashboard', function (): void {
+    User::factory()->withoutTwoFactor()->create(['email' => 'ayse@example.com']);
+
+    $page = visit('/login');
+
+    $page->assertNoJavascriptErrors()
+        ->fill('email', 'ayse@example.com')
+        ->fill('password', 'password')
+        ->press('Log in')
+        ->assertUrlIs(route('dashboard'))
+        ->assertNoJavascriptErrors();
+
+    $this->assertAuthenticated();
+});
+
+it('shows a validation error for a wrong password', function (): void {
+    User::factory()->withoutTwoFactor()->create(['email' => 'ayse@example.com']);
+
+    visit('/login')
+        ->fill('email', 'ayse@example.com')
+        ->fill('password', 'definitely-wrong')
+        ->press('Log in')
+        ->assertSee('These credentials do not match our records.')
+        ->assertNoJavascriptErrors();
+
+    $this->assertGuest();
+});
+
+it('keeps a plain user out of the admin area', function (): void {
+    $user = User::factory()->withoutTwoFactor()->create();
+    $user->assignRole(RoleEnum::User);
+
+    $this->actingAs($user);
+
+    visit('/admin')->assertSee('403');
+});

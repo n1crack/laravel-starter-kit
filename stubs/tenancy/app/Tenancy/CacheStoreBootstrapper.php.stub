@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tenancy;
+
+use Illuminate\Cache\RateLimiter;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Facade;
+use Stancl\Tenancy\Contracts\TenancyBootstrapper;
+use Stancl\Tenancy\Contracts\Tenant;
+
+/**
+ * Keeps the cache, the session and the rate limiter inside the tenant they
+ * belong to.
+ *
+ * Their tables live in the tenant database, so swapping the connection ought
+ * to be enough. It is not: each of these is resolved once and then held in the
+ * container, keeping the connection it was built with, so one tenant ends up
+ * reading another's rows — or, in the rate limiter's case, reaching for a
+ * `cache` table the central database does not have and taking sign-in down
+ * with it.
+ *
+ * Forgetting the resolved instances makes the next call rebuild them against
+ * the current connection. This is also why `CacheTenancyBootstrapper` is not
+ * used: it isolates by tagging, and this application's default `database`
+ * store cannot tag at all.
+ */
+final readonly class CacheStoreBootstrapper implements TenancyBootstrapper
+{
+    public function __construct(private Application $app)
+    {
+        //
+    }
+
+    public function bootstrap(Tenant $tenant): void
+    {
+        $this->forgetResolved();
+    }
+
+    public function revert(): void
+    {
+        $this->forgetResolved();
+    }
+
+    private function forgetResolved(): void
+    {
+        $default = $this->app->make(\Illuminate\Contracts\Config\Repository::class)->get('cache.default');
+
+        if (is_string($default)) {
+            $this->app->make(\Illuminate\Contracts\Cache\Factory::class)->forgetDriver($default);
+        }
+
+        $this->app->forgetInstance('cache.store');
+        $this->app->forgetInstance('session');
+        $this->app->forgetInstance('session.store');
+
+        // A resolved guard holds the user it already authenticated. That is
+        // harmless per HTTP request, but a queue worker switching tenants
+        // in-process would otherwise carry one tenant's user into the next.
+        $this->app->forgetInstance('auth');
+
+        // Login throttling lives here, and it grabs its store at boot.
+        $this->app->forgetInstance(RateLimiter::class);
+
+        // Facades keep their own resolved instances, so dropping the container
+        // bindings alone leaves the old objects in play.
+        foreach (['auth', 'cache', 'cache.store', 'session', 'session.store', RateLimiter::class] as $accessor) {
+            Facade::clearResolvedInstance($accessor);
+        }
+    }
+}

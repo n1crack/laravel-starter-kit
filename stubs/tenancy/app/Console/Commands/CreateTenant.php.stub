@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Models\Tenant;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
+use Illuminate\Console\Command;
+
+use function Laravel\Prompts\text;
+
+/**
+ * Tenants are normally created by the application that administers them. This
+ * exists so the kit can be run locally, where there is otherwise no way to get
+ * a tenant to sign in to.
+ */
+#[Description('Create a tenant, its database and its first domain')]
+#[Signature('tenants:create
+        {domain? : The domain or subdomain that resolves to the tenant}
+        {--id= : The tenant id, defaulting to the domain}
+        {--seed : Run the tenant seeder, which creates demo users}')]
+final class CreateTenant extends Command
+{
+    public function handle(): int
+    {
+        $domain = $this->domain();
+
+        if ($domain === '') {
+            $this->components->error('A domain is required.');
+
+            return self::FAILURE;
+        }
+
+        $id = $this->option('id');
+        $id = is_string($id) && $id !== '' ? $id : $domain;
+
+        if (Tenant::query()->whereKey($id)->exists()) {
+            $this->components->error("Tenant [{$id}] already exists.");
+
+            return self::FAILURE;
+        }
+
+        // Saving the tenant fires the pipeline that creates and migrates its
+        // database.
+        $tenant = new Tenant(['id' => $id]);
+        $tenant->save();
+
+        $tenant->domains()->create(['domain' => $domain]);
+
+        if ($this->option('seed') === true) {
+            $this->call('tenants:seed', ['--tenants' => [$id]]);
+        }
+
+        $this->components->info("Tenant [{$id}] is served on [{$domain}].");
+
+        return self::SUCCESS;
+    }
+
+    private function domain(): string
+    {
+        $argument = $this->argument('domain');
+
+        if (is_string($argument) && $argument !== '') {
+            return mb_trim($argument);
+        }
+
+        if (! $this->input->isInteractive()) {
+            return '';
+        }
+
+        return mb_trim(text(
+            label: 'Which domain or subdomain should resolve to this tenant?',
+            placeholder: 'acme',
+            hint: 'A bare label is treated as a subdomain of your central domain.',
+        ));
+    }
+}

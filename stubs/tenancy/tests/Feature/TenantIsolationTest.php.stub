@@ -1,0 +1,150 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Role as RoleEnum;
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\Tenant;
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Role;
+
+/**
+ * The Pest hook already put us inside one tenant. These build a second one and
+ * check that nothing crosses between them.
+ */
+function secondTenant(): Tenant
+{
+    $tenant = Tenant::query()->create();
+    $tenant->domains()->create(['domain' => 'second']);
+
+    return $tenant;
+}
+
+function insideTenant(Tenant $tenant, Closure $work): mixed
+{
+    $previous = tenant();
+
+    tenancy()->initialize($tenant);
+
+    try {
+        return $work();
+    } finally {
+        tenancy()->end();
+
+        if ($previous instanceof Tenant) {
+            tenancy()->initialize($previous);
+        }
+    }
+}
+
+it('gives each tenant its own database', function (): void {
+    $other = secondTenant();
+
+    expect(tenant()?->getTenantKey())->not->toBe($other->getTenantKey())
+        ->and(tenant()?->database()->getName())->not->toBe($other->database()->getName());
+});
+
+it('does not share users between tenants', function (): void {
+    User::factory()->create(['email' => 'same@example.com']);
+
+    $countInOther = insideTenant(secondTenant(), function (): int {
+        User::factory()->create(['email' => 'same@example.com']);
+
+        return User::query()->count();
+    });
+
+    expect($countInOther)->toBe(1)
+        ->and(User::query()->count())->toBe(1);
+});
+
+it('does not share cache between tenants', function (): void {
+    // The test environment uses the `array` store, which lives in memory and so
+    // is thrown away when the bootstrapper rebuilds it on a tenancy switch.
+    // `database` is the kit's real default and the one worth proving: it keeps
+    // each tenant's rows in that tenant's own database.
+    config(['cache.default' => 'database']);
+
+    Cache::put('secret', 'first-tenant', 60);
+
+    $seen = insideTenant(secondTenant(), function (): mixed {
+        Cache::put('secret', 'second-tenant', 60);
+
+        return Cache::get('secret');
+    });
+
+    expect($seen)->toBe('second-tenant')
+        ->and(Cache::get('secret'))->toBe('first-tenant');
+});
+
+it('loses nothing when tenancy is switched away and back', function (): void {
+    config(['cache.default' => 'database']);
+
+    Cache::put('round-trip', 'kept', 60);
+
+    insideTenant(secondTenant(), fn (): bool => true);
+
+    expect(Cache::get('round-trip'))->toBe('kept');
+});
+
+it('does not share teams between tenants', function (): void {
+    $owner = User::factory()->create();
+    Team::factory()->create(['owner_id' => $owner->id, 'name' => 'First tenant team']);
+
+    $teamsInOther = insideTenant(secondTenant(), fn (): int => Team::query()->count());
+
+    expect($teamsInOther)->toBe(0)
+        ->and(Team::query()->count())->toBe(1);
+});
+
+it('does not share roles between tenants', function (): void {
+    Role::findOrCreate('billing-manager');
+
+    $rolesInOther = insideTenant(
+        secondTenant(),
+        fn (): bool => Role::query()->where('name', 'billing-manager')->exists(),
+    );
+
+    expect($rolesInOther)->toBeFalse();
+});
+
+it('keeps application tables out of the central database', function (string $table): void {
+    $central = Schema::connection(config('tenancy.database.central_connection'));
+
+    expect($central->hasTable($table))->toBeFalse()
+        ->and(Schema::hasTable($table))->toBeTrue();
+})->with(['users', 'sessions', 'cache', 'roles', 'teams']);
+
+it('keeps tenant registry tables out of the tenant database', function (string $table): void {
+    $central = Schema::connection(config('tenancy.database.central_connection'));
+
+    expect($central->hasTable($table))->toBeTrue()
+        ->and(Schema::hasTable($table))->toBeFalse();
+})->with(['tenants', 'domains']);
+
+it('keeps the queue central so one worker serves every tenant', function (): void {
+    $central = Schema::connection(config('tenancy.database.central_connection'));
+
+    expect($central->hasTable('jobs'))->toBeTrue()
+        ->and(Schema::hasTable('jobs'))->toBeFalse();
+});
+
+it('scopes a team role to the tenant that owns the team', function (): void {
+    $owner = User::factory()->create();
+    $owner->assignRole(RoleEnum::Admin);
+
+    $team = Team::factory()->create(['owner_id' => $owner->id]);
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    expect($team->roleFor($owner))->toBe(TeamRole::Owner)
+        ->and($owner->hasRole(RoleEnum::Admin->value))->toBeTrue();
+
+    $adminElsewhere = insideTenant(
+        secondTenant(),
+        fn (): int => User::query()->count(),
+    );
+
+    expect($adminElsewhere)->toBe(0);
+});
