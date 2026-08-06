@@ -64,19 +64,27 @@ final class InstallStarterKit extends Command
             $this->components->info('Team support added.');
         }
 
-        if ($this->tenancy()) {
+        // The answers are collected in prompt order, but tenancy is installed
+        // after the driver is known: SQLite tenant databases are plain files
+        // and need a suffix so they match the `*.sqlite*` ignore rule.
+        $tenancy = $this->tenancy();
+        $centralDomains = $tenancy ? $this->centralDomains() : [];
+        $tenantPrefix = $tenancy ? $this->tenantPrefix() : 'tenant';
+
+        $driver = $this->database();
+
+        if ($tenancy) {
             $installTenancy->handle(
                 base_path(),
                 base_path('stubs/tenancy'),
-                $this->centralDomains(),
-                $this->tenantPrefix(),
+                $centralDomains,
+                $tenantPrefix,
+                $driver,
             );
 
             $this->components->info('Multi-tenancy added.');
             $this->components->warn('Run "composer update" to install '.InstallTenancy::PACKAGE.'.');
         }
-
-        $driver = $this->database();
 
         $configureDatabase->handle($driver, base_path(), $this->databaseName());
 

@@ -112,7 +112,15 @@ it('writes the central domains and tenant prefix into the config', function (): 
         ->toContain("'app.test',")
         ->toContain("'admin.app.test',")
         ->toContain("'prefix' => 'acme'")
+        ->toContain("'suffix' => ''")
         ->not->toContain("'127.0.0.1',");
+});
+
+it('suffixes sqlite tenant databases so they are ignored by git', function (): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--database' => 'sqlite', '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->files->get($this->scratch.'/config/tenancy.php'))->toContain("'suffix' => '.sqlite'");
 });
 
 it('moves the kit migrations into the tenant directory', function (): void {

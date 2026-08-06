@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\DatabaseDriver;
 use Illuminate\Filesystem\Filesystem;
 
 final readonly class InstallTenancy
@@ -139,13 +140,18 @@ final readonly class InstallTenancy
      *
      * @param  list<string>  $centralDomains
      */
-    public function handle(string $basePath, string $stubPath, array $centralDomains, string $databasePrefix): void
-    {
+    public function handle(
+        string $basePath,
+        string $stubPath,
+        array $centralDomains,
+        string $databasePrefix,
+        DatabaseDriver $driver,
+    ): void {
         $this->publishStubs->handle($stubPath, $basePath);
         $this->patchFiles->handle($basePath, self::PATCHES);
 
         $this->moveMigrationsToTenant($basePath);
-        $this->configure($basePath, $centralDomains, $databasePrefix);
+        $this->configure($basePath, $centralDomains, $databasePrefix, $driver);
     }
 
     /**
@@ -179,8 +185,12 @@ final readonly class InstallTenancy
     /**
      * @param  list<string>  $centralDomains
      */
-    private function configure(string $basePath, array $centralDomains, string $databasePrefix): void
-    {
+    private function configure(
+        string $basePath,
+        array $centralDomains,
+        string $databasePrefix,
+        DatabaseDriver $driver,
+    ): void {
         // Published by `handle()` moments ago, so it is always there.
         $path = $basePath.'/config/tenancy.php';
 
@@ -200,6 +210,16 @@ final readonly class InstallTenancy
         $config = (string) preg_replace(
             "/'prefix' => '[^']*'/",
             "'prefix' => '".$databasePrefix."'",
+            $config,
+            1,
+        );
+
+        // A SQLite tenant database is a file named after the database, so
+        // without this it lands in `database/` with no extension and slips
+        // past the `*.sqlite*` ignore rule.
+        $config = (string) preg_replace(
+            "/'suffix' => '[^']*'/",
+            "'suffix' => '".($driver === DatabaseDriver::Sqlite ? '.sqlite' : '')."'",
             $config,
             1,
         );
