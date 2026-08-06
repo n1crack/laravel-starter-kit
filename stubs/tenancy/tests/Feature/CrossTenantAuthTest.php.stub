@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Role as RoleEnum;
+use App\Models\Tenant;
+use App\Models\User;
+
+/**
+ * The security question: can a session, or an identity, cross from one tenant
+ * to another? Both tenants deliberately hold a user with the same id and email.
+ */
+beforeEach(function (): void {
+    $this->other = Tenant::query()->create();
+    $this->other->domains()->create(['domain' => 'other']);
+
+    $previous = tenant();
+
+    tenancy()->initialize($this->other);
+    User::factory()->withoutTwoFactor()->create(['email' => 'ayse@example.com', 'name' => 'Other tenant Ayse']);
+    tenancy()->end();
+
+    if ($previous instanceof Tenant) {
+        tenancy()->initialize($previous);
+    }
+
+    User::factory()->withoutTwoFactor()->create(['email' => 'ayse@example.com', 'name' => 'First tenant Ayse']);
+});
+
+it('does not carry a signed in session to another tenant', function (): void {
+    $this->post('http://test.localhost/login', [
+        'email' => 'ayse@example.com',
+        'password' => 'password',
+    ])->assertRedirect();
+
+    $this->assertAuthenticated();
+
+    // Same browser, same cookies, different tenant domain. The redirect target
+    // is generated from the forced root URL the test harness sets, so what
+    // matters here is that the other tenant refuses to serve the dashboard.
+    $this->get('http://other.localhost/dashboard')->assertRedirect();
+
+    expect(auth()->check())->toBeFalse();
+});
+
+it('refuses a password that only works in the other tenant', function (): void {
+    $previous = tenant();
+
+    tenancy()->initialize($this->other);
+    User::factory()->withoutTwoFactor()->create([
+        'email' => 'mehmet@example.com',
+        'password' => Illuminate\Support\Facades\Hash::make('other-tenant-secret'),
+    ]);
+    tenancy()->end();
+
+    if ($previous instanceof Tenant) {
+        tenancy()->initialize($previous);
+    }
+
+    $this->post('http://test.localhost/login', [
+        'email' => 'mehmet@example.com',
+        'password' => 'other-tenant-secret',
+    ])->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+});
+
+it('does not carry an admin role across tenants', function (): void {
+    $admin = User::query()->where('email', 'ayse@example.com')->sole();
+    $admin->assignRole(RoleEnum::Admin);
+
+    expect($admin->hasRole(RoleEnum::Admin->value))->toBeTrue();
+
+    $previous = tenant();
+
+    tenancy()->initialize($this->other);
+    $elsewhere = User::query()->where('email', 'ayse@example.com')->sole();
+    $isAdminElsewhere = $elsewhere->hasRole(RoleEnum::Admin->value);
+    tenancy()->end();
+
+    if ($previous instanceof Tenant) {
+        tenancy()->initialize($previous);
+    }
+
+    expect($isAdminElsewhere)->toBeFalse();
+});
+
+it('refuses a request for an unknown tenant', function (): void {
+    $this->get('http://nobody.localhost/login')->assertServerError();
+});
+
+it('does not serve the application on the central domain', function (): void {
+    $this->get('http://localhost/login')->assertNotFound();
+});
