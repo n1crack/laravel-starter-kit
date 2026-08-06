@@ -166,7 +166,28 @@ jobs:
           vendor/bin/rector --dry-run
           vendor/bin/phpstan analyse --no-progress
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(npm list playwright --depth=0 --json | jq -er '.dependencies.playwright.version')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright System Dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # The browser suite is what proves the generated pages actually work:
+      # a page answering 200 says nothing about whether its form submits.
       - name: Test the generated application
         run: |
           vendor/bin/pest --type-coverage --min=100
-          php artisan test --testsuite=Feature,Unit
+          php artisan test

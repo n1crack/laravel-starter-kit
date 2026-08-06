@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+
+it('creates a team from the teams page', function (): void {
+    $this->actingAs(User::factory()->withoutTwoFactor()->create());
+
+    visit(route('teams.index'))
+        ->assertNoJavascriptErrors()
+        ->fill('name', 'Engineering')
+        ->press('Create team')
+        ->assertSee('Engineering')
+        ->assertNoJavascriptErrors();
+
+    expect(Team::query()->where('name', 'Engineering')->exists())->toBeTrue();
+});
+
+it('shows a team to its member', function (): void {
+    $owner = User::factory()->withoutTwoFactor()->create();
+    $team = Team::factory()->create(['owner_id' => $owner->id, 'name' => 'Engineering']);
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    $this->actingAs($owner);
+
+    visit(route('teams.edit', $team))
+        ->assertSee('Engineering')
+        ->assertSee($owner->email)
+        ->assertNoJavascriptErrors();
+});
