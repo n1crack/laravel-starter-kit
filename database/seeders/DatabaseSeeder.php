@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\SyncRolesAndPermissions;
 use App\Enums\Role as RoleEnum;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 
 final class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (RoleEnum::cases() as $role) {
-            Role::findOrCreate($role->value);
-        }
+        resolve(SyncRolesAndPermissions::class)->handle();
 
         $admin = User::factory()->create([
             'name' => 'Admin',

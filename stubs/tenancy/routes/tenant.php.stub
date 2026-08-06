@@ -27,7 +27,7 @@ Route::middleware([
 ])->group(function (): void {
     require base_path('routes/web.php');
 
-    Route::middleware(['auth', 'verified', 'role:admin'])
+    Route::middleware(['auth', 'verified', 'permission:access-admin'])
         ->prefix('admin')
         ->name('admin.')
         ->group(base_path('routes/admin.php'));

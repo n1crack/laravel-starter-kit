@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role as RoleEnum;
+use App\Actions\SyncRolesAndPermissions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -22,9 +21,7 @@ pest()->extend(TestCase::class)
 
         $this->freezeTime();
 
-        foreach (RoleEnum::cases() as $role) {
-            Role::findOrCreate($role->value);
-        }
+        resolve(SyncRolesAndPermissions::class)->handle();
     })
     ->in('Browser', 'Feature', 'Unit');
 

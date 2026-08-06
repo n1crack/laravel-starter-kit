@@ -36,16 +36,16 @@ final readonly class InstallTenancy
         // `PreventAccessFromCentralDomains` would refuse them.
         'tests/Pest.php' => [
             [
-                'use App\\Enums\\Role as RoleEnum;',
-                "use App\\Enums\\Role as RoleEnum;\nuse App\\Models\\Tenant;",
+                'use App\\Actions\\SyncRolesAndPermissions;',
+                "use App\\Actions\\SyncRolesAndPermissions;\nuse App\\Models\\Tenant;",
             ],
             [
                 'use Illuminate\\Support\\Facades\\Process;',
                 "use Illuminate\\Support\\Facades\\Process;\nuse Illuminate\\Support\\Facades\\URL;",
             ],
             [
-                "        \$this->freezeTime();\n\n        foreach (RoleEnum::cases() as \$role) {\n"
-                    ."            Role::findOrCreate(\$role->value);\n        }\n    })",
+                "        \$this->freezeTime();\n\n"
+                    ."        resolve(SyncRolesAndPermissions::class)->handle();\n    })",
                 "        \$this->freezeTime();\n\n"
                     ."        \$tenant = Tenant::query()->create();\n"
                     ."        \$tenant->domains()->create(['domain' => 'test']);\n\n"
@@ -59,8 +59,7 @@ final readonly class InstallTenancy
                     ."        ))]);\n\n"
                     ."        tenancy()->initialize(\$tenant);\n\n"
                     ."        URL::forceRootUrl('http://test.localhost');\n\n"
-                    ."        foreach (RoleEnum::cases() as \$role) {\n"
-                    ."            Role::findOrCreate(\$role->value);\n        }\n    })\n"
+                    ."        resolve(SyncRolesAndPermissions::class)->handle();\n    })\n"
                     ."    ->afterEach(function (): void {\n"
                     ."        \$tenant = tenant();\n\n"
                     ."        tenancy()->end();\n\n"
@@ -98,7 +97,7 @@ final readonly class InstallTenancy
                 "        web: __DIR__.'/../routes/web.php',\n"
                     ."        commands: __DIR__.'/../routes/console.php',\n"
                     ."        then: function (): void {\n"
-                    ."            Route::middleware(['web', 'auth', 'verified', 'role:admin'])\n"
+                    ."            Route::middleware(['web', 'auth', 'verified', 'permission:access-admin'])\n"
                     ."                ->prefix('admin')\n"
                     ."                ->name('admin.')\n"
                     ."                ->group(base_path('routes/admin.php'));\n"
