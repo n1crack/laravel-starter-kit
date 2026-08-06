@@ -100,6 +100,13 @@ jobs:
 
     strategy:
       fail-fast: false
+
+      # A Free plan allows 20 concurrent jobs across the whole account, and
+      # this matrix would claim six of them at once while other repositories
+      # are waiting for the same pool. Two at a time costs wall-clock here and
+      # leaves room everywhere else.
+      max-parallel: 2
+
       matrix:
         include:
           - name: default
