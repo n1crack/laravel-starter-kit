@@ -12,10 +12,11 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminRoles } from '@/routes/admin/roles';
 import { index as adminUsers } from '@/routes/admin/users';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { LayoutGrid, PanelLeft, Users } from 'lucide-react';
+import { LayoutGrid, PanelLeft, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -28,6 +29,11 @@ const mainNavItems: NavItem[] = [
         title: 'Users',
         href: adminUsers(),
         icon: Users,
+    },
+    {
+        title: 'Roles',
+        href: adminRoles(),
+        icon: ShieldCheck,
     },
 ];
 

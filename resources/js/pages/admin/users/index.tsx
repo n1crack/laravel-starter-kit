@@ -10,12 +10,18 @@ import { Input } from '@/components/ui/input';
 import { MultiSelect } from '@/components/ui/multi-select';
 import AdminLayout from '@/layouts/admin-layout';
 import { dashboard } from '@/routes/admin';
-import { index as usersIndex } from '@/routes/admin/users';
+import {
+    destroy as destroyUser,
+    index as usersIndex,
+    store as inviteUser,
+    update as updateUser,
+    verify as verifyUser,
+} from '@/routes/admin/users';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 interface UserRow {
     id: number;
@@ -50,7 +56,9 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const columns: ColumnDef<DataTableFeatures, UserRow>[] = [
+const buildColumns = (
+    availableRoles: string[],
+): ColumnDef<DataTableFeatures, UserRow>[] => [
     {
         accessorKey: 'name',
         header: ({ column }) => (
@@ -113,12 +121,77 @@ const columns: ColumnDef<DataTableFeatures, UserRow>[] = [
             </Button>
         ),
     },
+    {
+        id: 'actions',
+        header: 'Manage',
+        cell: ({ row }) => (
+            <div className="flex items-center justify-end gap-1">
+                <MultiSelect
+                    options={availableRoles.map((role) => ({
+                        value: role,
+                        label: role,
+                    }))}
+                    values={row.original.roles}
+                    onValuesChange={(next) =>
+                        router.patch(
+                            updateUser(row.original.id).url,
+                            { roles: next },
+                            { preserveScroll: true },
+                        )
+                    }
+                    placeholder="Roles"
+                    className="w-40"
+                />
+
+                {!row.original.verified && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                            router.put(
+                                verifyUser(row.original.id).url,
+                                {},
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        Verify
+                    </Button>
+                )}
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                        router.delete(destroyUser(row.original.id).url, {
+                            preserveScroll: true,
+                        })
+                    }
+                >
+                    Delete
+                </Button>
+            </div>
+        ),
+    },
 ];
 
 export default function UsersIndex({ users, availableRoles, filters }: Props) {
     const [search, setSearch] = useState(filters.search);
     const [roles, setRoles] = useState<string[]>(filters.roles);
     const isFirstRender = useRef(true);
+
+    const columns = buildColumns(availableRoles);
+
+    const invite = useForm<{ name: string; email: string; roles: string[] }>({
+        name: '',
+        email: '',
+        roles: [],
+    });
+
+    const submitInvite = (event: FormEvent) => {
+        event.preventDefault();
+        invite.post(inviteUser().url, { onSuccess: () => invite.reset() });
+    };
 
     useEffect(() => {
         if (isFirstRender.current) {
@@ -166,6 +239,59 @@ export default function UsersIndex({ users, availableRoles, filters }: Props) {
                         {users.total} users
                     </p>
                 </div>
+
+                <form
+                    onSubmit={submitInvite}
+                    className="flex flex-col gap-2 sm:flex-row sm:items-start"
+                >
+                    <div className="sm:max-w-xs">
+                        <Input
+                            name="name"
+                            value={invite.data.name}
+                            onChange={(event) =>
+                                invite.setData('name', event.target.value)
+                            }
+                            placeholder="Name"
+                        />
+                        {invite.errors.name && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                {invite.errors.name}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="sm:max-w-xs">
+                        <Input
+                            name="email"
+                            type="email"
+                            value={invite.data.email}
+                            onChange={(event) =>
+                                invite.setData('email', event.target.value)
+                            }
+                            placeholder="teammate@example.com"
+                        />
+                        {invite.errors.email && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                {invite.errors.email}
+                            </p>
+                        )}
+                    </div>
+
+                    <MultiSelect
+                        options={availableRoles.map((role) => ({
+                            value: role,
+                            label: role,
+                        }))}
+                        values={invite.data.roles}
+                        onValuesChange={(next) => invite.setData('roles', next)}
+                        placeholder="Roles"
+                        className="sm:max-w-xs"
+                    />
+
+                    <Button type="submit" disabled={invite.processing}>
+                        Invite
+                    </Button>
+                </form>
 
                 <DataTable
                     columns={columns}

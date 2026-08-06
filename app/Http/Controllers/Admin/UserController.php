@@ -4,9 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\DeleteUser;
+use App\Actions\InviteUser;
+use App\Actions\MarkUserEmailVerified;
+use App\Actions\SyncUserRoles;
+use App\Http\Requests\InviteUserRequest;
+use App\Http\Requests\UpdateUserRolesRequest;
 use App\Models\User;
+use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -48,5 +57,62 @@ final readonly class UserController
                 'roles' => $roles,
             ],
         ]);
+    }
+
+    public function store(InviteUserRequest $request, InviteUser $action): RedirectResponse
+    {
+        $action->handle(
+            $request->string('name')->value(),
+            $request->string('email')->value(),
+            $this->roles($request->validated('roles')),
+        );
+
+        return to_route('admin.users.index');
+    }
+
+    public function update(UpdateUserRolesRequest $request, User $user, SyncUserRoles $action): RedirectResponse
+    {
+        $action->handle($user, $this->roles($request->validated('roles')));
+
+        return to_route('admin.users.index');
+    }
+
+    public function verify(User $user, MarkUserEmailVerified $action): RedirectResponse
+    {
+        $action->handle($user);
+
+        return to_route('admin.users.index');
+    }
+
+    /**
+     * An administrator deleting their own account here would lock themselves
+     * out mid-session; the profile page is where that belongs.
+     */
+    public function destroy(User $user, #[CurrentUser] User $current, DeleteUser $action): RedirectResponse
+    {
+        if ($user->is($current)) {
+            throw ValidationException::withMessages([
+                'user' => 'You cannot delete your own account from here.',
+            ]);
+        }
+
+        $action->handle($user);
+
+        return to_route('admin.users.index');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function roles(mixed $roles): array
+    {
+        if (! is_array($roles)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn (mixed $name): string => is_string($name) ? $name : '',
+            $roles,
+        )));
     }
 }

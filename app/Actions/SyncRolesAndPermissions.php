@@ -37,6 +37,6 @@ final readonly class SyncRolesAndPermissions
             }
         }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        resolve(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
