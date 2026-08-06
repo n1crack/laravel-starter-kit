@@ -98,6 +98,12 @@ jobs:
   install:
     runs-on: ubuntu-latest
 
+    # Only on the way into main. A pull request gets the `ci` job alone, which
+    # keeps a review down to one runner while other repositories are competing
+    # for the same twenty. The cost is that a broken install shows up on main
+    # rather than on the pull request that caused it.
+    if: github.event_name == 'push'
+
     strategy:
       fail-fast: false
 
