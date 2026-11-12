@@ -75,14 +75,16 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     {/* Mobile Menu */}
                     <div className="lg:hidden">
                         <Sheet>
-                            <SheetTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
-                                >
-                                    <Menu className="h-5 w-5" />
-                                </Button>
+                            <SheetTrigger
+                                render={
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="mr-2 h-[34px] w-[34px]"
+                                    />
+                                }
+                            >
+                                <Menu className="h-5 w-5" />
                             </SheetTrigger>
                             <SheetContent
                                 side="left"
@@ -202,33 +204,32 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                             </Button>
                             <div className="hidden lg:flex">
                                 {rightNavItems.map((item) => (
-                                    <TooltipProvider
-                                        key={item.title}
-                                        delayDuration={0}
-                                    >
+                                    <TooltipProvider key={item.title} delay={0}>
                                         <Tooltip>
-                                            <TooltipTrigger>
-                                                <a
-                                                    href={
-                                                        typeof item.href ===
-                                                        'string'
-                                                            ? item.href
-                                                            : item.href.url
-                                                    }
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium text-accent-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                                                >
-                                                    <span className="sr-only">
-                                                        {item.title}
-                                                    </span>
-                                                    {item.icon && (
-                                                        <Icon
-                                                            iconNode={item.icon}
-                                                            className="size-5 opacity-80 group-hover:opacity-100"
-                                                        />
-                                                    )}
-                                                </a>
+                                            <TooltipTrigger
+                                                render={
+                                                    <a
+                                                        href={
+                                                            typeof item.href ===
+                                                            'string'
+                                                                ? item.href
+                                                                : item.href.url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0 text-sm font-medium text-accent-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                                                    />
+                                                }
+                                            >
+                                                <span className="sr-only">
+                                                    {item.title}
+                                                </span>
+                                                {item.icon && (
+                                                    <Icon
+                                                        iconNode={item.icon}
+                                                        className="size-5 opacity-80 group-hover:opacity-100"
+                                                    />
+                                                )}
                                             </TooltipTrigger>
                                             <TooltipContent>
                                                 <p>{item.title}</p>
@@ -239,21 +240,23 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                             </div>
                         </div>
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    className="size-10 rounded-full p-1"
-                                >
-                                    <Avatar className="size-8 overflow-hidden rounded-full">
-                                        <AvatarImage
-                                            src={auth.user.avatar}
-                                            alt={auth.user.name}
-                                        />
-                                        <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
-                                            {getInitials(auth.user.name)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                </Button>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button
+                                        variant="ghost"
+                                        className="size-10 rounded-full p-1"
+                                    />
+                                }
+                            >
+                                <Avatar className="size-8 overflow-hidden rounded-full">
+                                    <AvatarImage
+                                        src={auth.user.avatar}
+                                        alt={auth.user.name}
+                                    />
+                                    <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
+                                        {getInitials(auth.user.name)}
+                                    </AvatarFallback>
+                                </Avatar>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56" align="end">
                                 <UserMenuContent user={auth.user} />

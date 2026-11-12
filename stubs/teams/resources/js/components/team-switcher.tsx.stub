@@ -1,6 +1,7 @@
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -30,35 +31,35 @@ export function TeamSwitcher() {
         <SidebarMenu>
             <SidebarMenuItem>
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton size="lg">
-                            <span className="flex-1 truncate text-left font-medium">
-                                {current?.name ?? 'Select a team'}
-                            </span>
-                            <ChevronsUpDown className="ml-auto size-4" />
-                        </SidebarMenuButton>
+                    <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
+                        <span className="flex-1 truncate text-left font-medium">
+                            {current?.name ?? 'Select a team'}
+                        </span>
+                        <ChevronsUpDown className="ml-auto size-4" />
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent className="w-56" align="start">
-                        <DropdownMenuLabel>Teams</DropdownMenuLabel>
+                        <DropdownMenuGroup>
+                            <DropdownMenuLabel>Teams</DropdownMenuLabel>
 
-                        {teams.map((team) => (
-                            <DropdownMenuItem
-                                key={team.id}
-                                onClick={() =>
-                                    router.put(switchTeam(team.id).url, {}, {
-                                        preserveScroll: true,
-                                    })
-                                }
-                            >
-                                {team.name}
-                            </DropdownMenuItem>
-                        ))}
+                            {teams.map((team) => (
+                                <DropdownMenuItem
+                                    key={team.id}
+                                    onClick={() =>
+                                        router.put(switchTeam(team.id).url, {}, {
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                >
+                                    {team.name}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuGroup>
 
                         <DropdownMenuSeparator />
 
-                        <DropdownMenuItem asChild>
-                            <Link href={teamsIndex()}>Manage teams</Link>
+                        <DropdownMenuItem render={<Link href={teamsIndex()} />}>
+                            Manage teams
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

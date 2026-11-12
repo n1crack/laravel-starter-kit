@@ -44,14 +44,17 @@ export function MultiSelect({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
+            <PopoverTrigger
+                render={
+                    <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
                     disabled={disabled}
                     className={cn('h-auto min-h-9 w-full justify-between font-normal', className)}
-                >
+                    />
+                }
+            >
                     <div className="flex flex-wrap items-center gap-1">
                         {selected.length === 0 && <span className="text-muted-foreground">{placeholder}</span>}
                         {selected.slice(0, maxVisible).map((option) => (
@@ -83,9 +86,8 @@ export function MultiSelect({
                         )}
                     </div>
                     <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
-                </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+            <PopoverContent className="w-(--anchor-width) p-0" align="start">
                 <Command>
                     <CommandInput placeholder={searchPlaceholder} />
                     <CommandList>

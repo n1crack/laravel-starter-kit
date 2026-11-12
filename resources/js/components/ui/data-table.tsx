@@ -109,10 +109,14 @@ export function DataTablePagination({ links }: { links: PaginationLink[] }) {
         <div className="flex flex-wrap items-center justify-center gap-1">
             {links.map((link, index) =>
                 link.url ? (
-                    <Button key={index} variant={link.active ? 'default' : 'outline'} size="sm" asChild>
-                        <Link href={link.url} preserveScroll preserveState>
+                    <Button
+                        key={index}
+                        variant={link.active ? 'default' : 'outline'}
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href={link.url} preserveScroll preserveState />}
+                    >
                             <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                        </Link>
                     </Button>
                 ) : (
                     <Button key={index} variant="outline" size="sm" disabled>

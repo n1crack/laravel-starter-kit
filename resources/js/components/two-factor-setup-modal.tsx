@@ -277,27 +277,23 @@ export default function TwoFactorSetupModal({
         setShowVerificationStep(true);
     }, []);
 
-    const resetModalState = useCallback(() => {
+    const handleClose = useCallback(() => {
         setShowVerificationStep(false);
         if (twoFactorEnabled) {
             clearSetupData();
         }
-    }, [twoFactorEnabled, clearSetupData]);
+
+        onClose();
+    }, [twoFactorEnabled, clearSetupData, onClose]);
 
     useEffect(() => {
-        if (!isOpen) {
-            resetModalState();
-
-            return;
-        }
-
-        if (!qrCodeSvg) {
+        if (isOpen && !qrCodeSvg) {
             void fetchSetupData();
         }
-    }, [isOpen, qrCodeSvg, fetchSetupData, resetModalState]);
+    }, [isOpen, qrCodeSvg, fetchSetupData]);
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader className="flex items-center justify-center">
                     <GridScanIcon />
@@ -310,7 +306,7 @@ export default function TwoFactorSetupModal({
                 <div className="flex flex-col items-center space-y-5">
                     {showVerificationStep ? (
                         <TwoFactorVerificationStep
-                            onClose={onClose}
+                            onClose={handleClose}
                             onBack={() => setShowVerificationStep(false)}
                         />
                     ) : (

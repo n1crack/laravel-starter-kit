@@ -51,10 +51,11 @@ export function AdminSidebar() {
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={adminDashboard()} prefetch>
-                                <AppLogo />
-                            </Link>
+                        <SidebarMenuButton
+                            size="lg"
+                            render={<Link href={adminDashboard()} prefetch />}
+                        >
+                            <AppLogo />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
