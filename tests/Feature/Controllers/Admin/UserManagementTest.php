@@ -120,3 +120,102 @@ it('still lets a viewer read the list', function (): void {
 
     $this->actingAs($viewer)->get(route('admin.users.index'))->assertOk();
 });
+
+/**
+ * A role that can manage users but not roles — the shape of account the
+ * escalation checks exist for.
+ */
+function userManager(): User
+{
+    $role = Role::findOrCreate('user-manager');
+    $role->syncPermissions([PermissionEnum::AccessAdmin->value, PermissionEnum::ManageUsers->value]);
+
+    $manager = User::factory()->create();
+    $manager->assignRole($role);
+
+    return $manager;
+}
+
+it('refuses to let a user manager hand out a role with permissions they lack', function (string $method, string $route): void {
+    $manager = userManager();
+    $target = User::factory()->create();
+
+    $payload = [
+        'name' => 'Mehmet Demir',
+        'email' => 'mehmet@example.com',
+        'roles' => [RoleEnum::Admin->value],
+    ];
+
+    $this->actingAs($manager)
+        ->{$method}($method === 'post' ? route($route) : route($route, $target), $payload)
+        ->assertSessionHasErrors('roles.0');
+
+    expect($target->refresh()->hasRole(RoleEnum::Admin->value))->toBeFalse()
+        ->and(User::query()->where('email', 'mehmet@example.com')->exists())->toBeFalse();
+})->with([
+    'update' => ['patch', 'admin.users.update'],
+    'invite' => ['post', 'admin.users.store'],
+]);
+
+it('lets a user manager hand out a role within their own permissions', function (): void {
+    $manager = userManager();
+    $target = User::factory()->create();
+
+    $this->actingAs($manager)
+        ->patch(route('admin.users.update', $target), ['roles' => [RoleEnum::User->value]])
+        ->assertRedirect(route('admin.users.index'));
+
+    expect($target->refresh()->hasRole(RoleEnum::User->value))->toBeTrue();
+});
+
+it('refuses to let anyone change their own roles from here', function (): void {
+    User::factory()->create()->assignRole(RoleEnum::Admin);
+
+    $this->actingAs($this->admin)
+        ->patch(route('admin.users.update', $this->admin), ['roles' => [RoleEnum::User->value]])
+        ->assertSessionHasErrors('roles');
+
+    expect($this->admin->refresh()->hasRole(RoleEnum::Admin->value))->toBeTrue();
+});
+
+it('keeps a user manager away from someone holding more than they do', function (string $method, string $route): void {
+    $manager = userManager();
+
+    $this->actingAs($manager)
+        ->{$method}(route($route, $this->admin), ['roles' => []])
+        ->assertForbidden();
+
+    expect($this->admin->refresh()->hasRole(RoleEnum::Admin->value))->toBeTrue();
+})->with([
+    'update' => ['patch', 'admin.users.update'],
+    'destroy' => ['delete', 'admin.users.destroy'],
+]);
+
+it('lets one administrator demote another', function (): void {
+    $other = User::factory()->create();
+    $other->assignRole(RoleEnum::Admin);
+
+    $this->actingAs($this->admin)
+        ->patch(route('admin.users.update', $other), ['roles' => [RoleEnum::User->value]])
+        ->assertRedirect(route('admin.users.index'));
+
+    expect($other->refresh()->hasRole(RoleEnum::Admin->value))->toBeFalse();
+});
+
+it('keeps the last administrator', function (): void {
+    $superuser = User::factory()->create();
+    $superuser->givePermissionTo(array_map(
+        fn (PermissionEnum $permission): string => $permission->value,
+        PermissionEnum::cases(),
+    ));
+
+    $this->actingAs($superuser)
+        ->patch(route('admin.users.update', $this->admin), ['roles' => [RoleEnum::User->value]])
+        ->assertSessionHasErrors('roles');
+
+    $this->actingAs($superuser)
+        ->delete(route('admin.users.destroy', $this->admin))
+        ->assertSessionHasErrors('user');
+
+    expect($this->admin->refresh()->hasRole(RoleEnum::Admin->value))->toBeTrue();
+});

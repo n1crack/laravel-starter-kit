@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Role;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -11,7 +12,9 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -58,5 +61,37 @@ final class User extends Authenticatable implements MustVerifyEmail
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Whether this user already holds every permission in the given set, so
+     * handing it to someone else cannot grant more than this user has.
+     *
+     * @param  Collection<int, Permission>  $permissions
+     */
+    public function holdsEveryPermission(Collection $permissions): bool
+    {
+        return $permissions->pluck('id')
+            ->diff($this->getAllPermissions()->pluck('id'))
+            ->isEmpty();
+    }
+
+    /**
+     * Whether this user may change or remove the other: never someone who
+     * holds a permission this user lacks.
+     */
+    public function outranks(self $other): bool
+    {
+        return $this->holdsEveryPermission($other->getAllPermissions());
+    }
+
+    /**
+     * Whether this is the only account left holding the administrator role,
+     * which the application needs to be able to make another one.
+     */
+    public function isLastAdministrator(): bool
+    {
+        return $this->hasRole(Role::Admin->value)
+            && self::query()->role(Role::Admin->value)->count() === 1;
     }
 }
