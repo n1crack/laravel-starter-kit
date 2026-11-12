@@ -15,6 +15,9 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
+            // Types come from model docblocks alone, so they match in CI, where the
+            // build runs before any database exists.
+            skipDatabase: true,
         }),
     ],
 });
