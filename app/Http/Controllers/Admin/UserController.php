@@ -86,13 +86,23 @@ final readonly class UserController
 
     /**
      * An administrator deleting their own account here would lock themselves
-     * out mid-session; the profile page is where that belongs.
+     * out mid-session; the profile page is where that belongs. Nobody removes
+     * someone holding a permission they lack, and the last administrator
+     * stays, or nobody could make another one.
      */
     public function destroy(User $user, #[CurrentUser] User $current, DeleteUser $action): RedirectResponse
     {
         if ($user->is($current)) {
             throw ValidationException::withMessages([
                 'user' => 'You cannot delete your own account from here.',
+            ]);
+        }
+
+        abort_unless($current->outranks($user), 403);
+
+        if ($user->isLastAdministrator()) {
+            throw ValidationException::withMessages([
+                'user' => 'The last administrator cannot be deleted.',
             ]);
         }
 
