@@ -92,7 +92,7 @@ export default function RolesIndex({ roles, permissions }: Props) {
 
     const submitEdit = (event: FormEvent, role: RoleRow) => {
         event.preventDefault();
-        editForm.patch(update(role.id).url, {
+        editForm.patch(update(String(role.id)).url, {
             preserveScroll: true,
             onSuccess: () => setEditing(null),
         });
@@ -230,7 +230,8 @@ export default function RolesIndex({ roles, permissions }: Props) {
                                                 size="sm"
                                                 onClick={() =>
                                                     router.delete(
-                                                        destroy(role.id).url,
+                                                        destroy(String(role.id))
+                                                            .url,
                                                         {
                                                             preserveScroll: true,
                                                         },
