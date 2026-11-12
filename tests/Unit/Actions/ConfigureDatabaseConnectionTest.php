@@ -78,7 +78,7 @@ it('configures both environment files', function (): void {
 });
 
 it('skips environment files that do not exist', function (): void {
-    unlink($this->basePath.'/.env.example');
+    Illuminate\Support\Facades\File::delete($this->basePath.'/.env.example');
 
     configureDatabase(DatabaseDriver::Mysql, $this->basePath);
 

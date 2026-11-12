@@ -56,7 +56,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
                                 size="sm"
                                 variant="ghost"
-                                asChild
+                                nativeButton={false}
+                                render={<Link href={item.href} />}
                                 className={cn('w-full justify-start', {
                                     'bg-muted':
                                         currentPath ===
@@ -65,12 +66,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                             : item.href.url),
                                 })}
                             >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
-                                    )}
-                                    {item.title}
-                                </Link>
+                                {item.icon && <item.icon className="h-4 w-4" />}
+                                {item.title}
                             </Button>
                         ))}
                     </nav>

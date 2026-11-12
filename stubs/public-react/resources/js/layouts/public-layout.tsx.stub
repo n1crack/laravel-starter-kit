@@ -3,6 +3,10 @@ import { login, register } from '@/routes';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
+// ponytail: read once per module load, so a long-running SSR process keeps last year's
+// value past New Year until it restarts. Share the year as an Inertia prop if that matters.
+const currentYear = new Date().getFullYear();
+
 /**
  * The public shell. Deliberately unlike the user and admin layouts: no
  * sidebar, no breadcrumbs, just a marketing header and footer around a
@@ -37,7 +41,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
             <main className="flex-1">{children}</main>
 
             <footer className="border-border/60 text-muted-foreground border-t px-6 py-8 text-center text-sm">
-                &copy; {new Date().getFullYear()}
+                &copy; {currentYear}
             </footer>
         </div>
     );

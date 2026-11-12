@@ -30,7 +30,7 @@ final readonly class InstallReactPublicPages
         // The public pages were the only thing Livewire was used for.
         'composer.json' => [
             [
-                "\"livewire/livewire\": \"^4.3\",\n        ",
+                "\"livewire/livewire\": \"^4.4.8\",\n        ",
                 '',
             ],
         ],

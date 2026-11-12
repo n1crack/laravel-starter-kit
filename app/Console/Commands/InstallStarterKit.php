@@ -123,7 +123,7 @@ final class InstallStarterKit extends Command
             return PublicStack::Livewire;
         }
 
-        return PublicStack::from(select(
+        return PublicStack::from((string) select(
             label: 'How should the public pages be rendered?',
             options: PublicStack::options(),
             default: PublicStack::Livewire->value,
@@ -230,7 +230,7 @@ final class InstallStarterKit extends Command
             return DatabaseDriver::Sqlite;
         }
 
-        return DatabaseDriver::from(select(
+        return DatabaseDriver::from((string) select(
             label: 'Which database will your application use?',
             options: DatabaseDriver::options(),
             default: DatabaseDriver::Sqlite->value,

@@ -24,8 +24,8 @@ final readonly class InstallTenancy
         // asked for it. Composer still has to be run afterwards.
         'composer.json' => [
             [
-                '"spatie/laravel-permission": "^8.3"',
-                "\"spatie/laravel-permission\": \"^8.3\",\n        \"stancl/tenancy\": \"^3.10\"",
+                '"spatie/laravel-permission": "^8.5"',
+                "\"spatie/laravel-permission\": \"^8.5\",\n        \"stancl/tenancy\": \"^3.10\"",
             ],
         ],
 
@@ -76,7 +76,7 @@ final readonly class InstallTenancy
                 "    public function run(): void\n    {\n",
                 "    public function run(): void\n    {\n"
                     ."        if (! tenancy()->initialized) {\n"
-                    ."            \$this->command->warn('Nothing is seeded centrally. Run tenants:create or tenants:seed instead.');\n\n"
+                    ."            \$this->command?->warn('Nothing is seeded centrally. Run tenants:create or tenants:seed instead.');\n\n"
                     ."            return;\n        }\n\n",
             ],
         ],
