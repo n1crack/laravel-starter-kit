@@ -72,6 +72,17 @@ it('invites someone and lets them set their own password', function (): void {
     Notification::assertSentTo($invited, ResetPassword::class);
 });
 
+it('invites someone without a role when none are sent', function (): void {
+    Notification::fake();
+
+    $this->actingAs($this->admin)->post(route('admin.users.store'), [
+        'name' => 'Mehmet Demir',
+        'email' => 'mehmet@example.com',
+    ])->assertRedirect(route('admin.users.index'));
+
+    expect(User::query()->where('email', 'mehmet@example.com')->sole()->roles)->toBeEmpty();
+});
+
 it('refuses to invite an address that already has an account', function (): void {
     User::factory()->create(['email' => 'mehmet@example.com']);
 

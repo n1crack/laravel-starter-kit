@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Role as RoleEnum;
+use App\Enums\TeamRole;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Only installed alongside teams: a tenancy install without them has no
+ * `Team` model or `teams` table to isolate.
+ */
+it('keeps the teams table out of the central database', function (): void {
+    $central = Schema::connection(config('tenancy.database.central_connection'));
+
+    expect($central->hasTable('teams'))->toBeFalse()
+        ->and(Schema::hasTable('teams'))->toBeTrue();
+});
+
+it('does not share teams between tenants', function (): void {
+    $owner = User::factory()->create();
+    Team::factory()->create(['owner_id' => $owner->id, 'name' => 'First tenant team']);
+
+    $teamsInOther = insideTenant(secondTenant(), fn (): int => Team::query()->count());
+
+    expect($teamsInOther)->toBe(0)
+        ->and(Team::query()->count())->toBe(1);
+});
+
+it('scopes a team role to the tenant that owns the team', function (): void {
+    $owner = User::factory()->create();
+    $owner->assignRole(RoleEnum::Admin);
+
+    $team = Team::factory()->create(['owner_id' => $owner->id]);
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+
+    expect($team->roleFor($owner))->toBe(TeamRole::Owner)
+        ->and($owner->hasRole(RoleEnum::Admin->value))->toBeTrue();
+
+    $adminElsewhere = insideTenant(
+        secondTenant(),
+        fn (): int => User::query()->count(),
+    );
+
+    expect($adminElsewhere)->toBe(0);
+});
