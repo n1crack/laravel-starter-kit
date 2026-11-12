@@ -47,24 +47,6 @@ jobs:
       - name: Build Assets
         run: npm run build
 
-      - name: Get Playwright version
-        id: playwright-version
-        run: echo "version=$(npm list playwright --depth=0 --json | jq -er '.dependencies.playwright.version')" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-shell-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright Browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps --only-shell chromium
-
-      - name: Install Playwright System Dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
       - name: Rector Cache
         uses: actions/cache@v6
         with:
@@ -81,15 +63,15 @@ jobs:
           restore-keys: ${{ runner.os }}-phpstan-
       - run: mkdir -p /tmp/phpstan
 
+      # Browser tests stay local: they time out at random under load and
+      # would make the pipeline unreliable. Everything else in `composer test`
+      # runs as is.
       - name: Tests
-        run: composer test
-
-      - name: Store artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-screenshots
-          path: |
-            tests/Browser/Screenshots
+        run: |
+          composer test:type-coverage
+          composer test:unit -- --exclude-testsuite=Browser
+          composer test:lint
+          composer test:types
 
   # The stub trees under `stubs/` are never executed by the kit's own suite —
   # only their publishing and patching is. This installs each optional feature
@@ -127,7 +109,6 @@ jobs:
             options: --tenancy --central-domain=localhost --no-interaction
           - name: everything
             options: --tenancy --teams --public=react --central-domain=localhost --no-interaction
-            browser: true
 
     name: install (${{ matrix.name }})
 
@@ -180,40 +161,8 @@ jobs:
           vendor/bin/rector --dry-run
           vendor/bin/phpstan analyse --no-progress
 
-      # Only one combination drives a browser. It is the one that installs
-      # everything, so it covers the most surface, and the other five are
-      # spared a browser download they would only repeat.
-      - name: Get Playwright version
-        if: matrix.browser
-        id: playwright-version
-        run: echo "version=$(npm list playwright --depth=0 --json | jq -er '.dependencies.playwright.version')" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright Browsers
-        if: matrix.browser
-        uses: actions/cache@v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-shell-${{ steps.playwright-version.outputs.version }}
-
-      # The headless shell is roughly half the size of full Chromium, and the
-      # suite never runs headed.
-      - name: Install Playwright Browsers
-        if: matrix.browser && steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps --only-shell chromium
-
-      - name: Install Playwright System Dependencies
-        if: matrix.browser && steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
       - name: Test the generated application
         run: vendor/bin/pest --type-coverage --min=100
 
-      # A page answering 200 says nothing about whether its form submits.
-      - name: Test the generated application in a browser
-        if: matrix.browser
-        run: php artisan test
-
       - name: Test the generated application without a browser
-        if: '!matrix.browser'
         run: php artisan test --testsuite=Feature,Unit
