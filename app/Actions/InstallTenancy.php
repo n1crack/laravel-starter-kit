@@ -65,6 +65,30 @@ final readonly class InstallTenancy
                     ."        tenancy()->end();\n\n"
                     ."        \$tenant?->delete();\n    })",
             ],
+            // Shared by every isolation test, including the teams one that
+            // only some installs get, so they live here rather than in a test.
+            [
+                "function something(): void\n{\n    // ..\n}",
+                "/**\n"
+                    ." * The Pest hook already put us inside one tenant. These build a second one\n"
+                    ." * so the isolation tests can check that nothing crosses between them.\n"
+                    ." */\n"
+                    ."function secondTenant(): Tenant\n{\n"
+                    ."    \$tenant = Tenant::query()->create();\n"
+                    ."    \$tenant->domains()->create(['domain' => 'second']);\n\n"
+                    ."    return \$tenant;\n}\n\n"
+                    ."function insideTenant(Tenant \$tenant, Closure \$work): mixed\n{\n"
+                    ."    \$previous = tenant();\n\n"
+                    ."    tenancy()->initialize(\$tenant);\n\n"
+                    ."    try {\n"
+                    ."        return \$work();\n"
+                    ."    } finally {\n"
+                    ."        tenancy()->end();\n\n"
+                    ."        if (\$previous instanceof Tenant) {\n"
+                    ."            tenancy()->initialize(\$previous);\n"
+                    ."        }\n"
+                    ."    }\n}",
+            ],
         ],
 
         // Everything this seeder creates — roles, users — now lives in a tenant
@@ -156,6 +180,12 @@ final readonly class InstallTenancy
     ): void {
         $this->publishStubs->handle($stubPath, $basePath);
         $this->patchFiles->handle($basePath, self::PATCHES);
+
+        // Teams are installed first, so their model is already here or never
+        // will be; without it the teams isolation test has nothing to test.
+        if (! $this->files->exists($basePath.'/app/Models/Team.php')) {
+            $this->files->delete($basePath.'/tests/Feature/TenantTeamIsolationTest.php');
+        }
 
         $this->moveMigrationsToTenant($basePath);
         $this->configure($basePath, $centralDomains, $databasePrefix, $driver);

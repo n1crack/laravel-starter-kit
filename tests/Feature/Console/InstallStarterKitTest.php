@@ -201,6 +201,9 @@ it('runs the generated tests inside a tenant', function (): void {
         ->toContain('tenancy()->initialize($tenant);')
         ->toContain("URL::forceRootUrl('http://test.localhost');")
         ->toContain('tenancy()->end();')
+        ->toContain('function secondTenant(): Tenant')
+        ->toContain('function insideTenant(Tenant $tenant, Closure $work): mixed')
+        ->not->toContain('function something(): void')
         ->and($this->files->get($this->scratch.'/database/seeders/DatabaseSeeder.php'))
         ->toContain('if (! tenancy()->initialized) {')
         ->and($this->scratch.'/app/Console/Commands/CreateTenant.php')->toBeReadableFile()
@@ -209,6 +212,17 @@ it('runs the generated tests inside a tenant', function (): void {
         ->toContain('App\Tenancy\CacheStoreBootstrapper::class,')
         ->not->toContain("\n        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,");
 });
+
+it('only keeps the teams isolation test when teams are installed', function (bool $teams): void {
+    $this->artisan('starter-kit:install', ['--tenancy' => true, '--teams' => $teams, '--no-interaction' => true])
+        ->assertSuccessful();
+
+    expect($this->files->exists($this->scratch.'/tests/Feature/TenantTeamIsolationTest.php'))->toBe($teams)
+        ->and($this->scratch.'/tests/Feature/TenantIsolationTest.php')->toBeReadableFile();
+})->with([
+    'with teams' => true,
+    'without teams' => false,
+]);
 
 it('hands the kit routes over to the tenant context', function (): void {
     $this->artisan('starter-kit:install', ['--tenancy' => true, '--no-interaction' => true])

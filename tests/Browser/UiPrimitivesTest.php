@@ -31,17 +31,16 @@ it('opens and dismisses the delete account dialog', function (): void {
         ->assertNoConsoleLogs();
 });
 
-it('renders the authenticated pages without errors', function (): void {
+it('renders the authenticated pages without errors', function (string $route): void {
     $this->actingAs(User::factory()->create());
 
-    $pages = visit([
-        route('dashboard', absolute: false),
-        route('user-profile.edit', absolute: false),
-        route('password.edit', absolute: false),
-        route('appearance.edit', absolute: false),
-        route('two-factor.show', absolute: false),
-    ]);
-
-    $pages->assertNoJavascriptErrors()
+    visit(route($route, absolute: false))
+        ->assertNoJavascriptErrors()
         ->assertNoConsoleLogs();
-});
+})->with([
+    'dashboard',
+    'user-profile.edit',
+    'password.edit',
+    'appearance.edit',
+    'two-factor.show',
+]);

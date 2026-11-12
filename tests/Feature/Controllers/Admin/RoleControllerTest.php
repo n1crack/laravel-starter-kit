@@ -36,6 +36,14 @@ it('creates a role with the permissions it was given', function (): void {
         ->and($role->hasPermissionTo(PermissionEnum::ManageRoles->value))->toBeFalse();
 });
 
+it('creates a role with no permissions when none are sent', function (): void {
+    $this->actingAs($this->admin)->post(route('admin.roles.store'), [
+        'name' => 'guest',
+    ])->assertRedirect(route('admin.roles.index'));
+
+    expect(Role::query()->where('name', 'guest')->sole()->permissions)->toBeEmpty();
+});
+
 it('refuses a permission the application does not define', function (): void {
     $this->actingAs($this->admin)->post(route('admin.roles.store'), [
         'name' => 'technician',
